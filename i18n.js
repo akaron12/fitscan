@@ -3,6 +3,7 @@
 const EN = {
   // Navigation & common
   'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Einstellungen': 'Settings',
+  'Eingebaute Lebensmittel durchsuchen': 'Browse built-in foods', 'Über 500 Lebensmittel. Mit dem Stern merkst du Favoriten.': 'Over 500 foods. Tap the star to save favorites.',
   'Update verfügbar': 'Update available', 'Neu laden': 'Reload', 'Produktdaten © Open-Food-Facts-Mitwirkende, Lizenz': 'Product data © Open Food Facts contributors, licence', 'Allgemeine Lebensmittel: USDA FoodData Central (gemeinfrei).': 'Generic foods: USDA FoodData Central (public domain).',
   'Daten: USDA FoodData Central (gemeinfrei) – Durchschnittswerte pro 100 g.': 'Data: USDA FoodData Central (public domain) – average values per 100 g.',
   'Nicht gefunden': 'Not found', 'Wartet auf Netz': 'Waiting for network', 'USDA-Suche aktivieren': 'Turn on USDA search', 'Keine Treffer bei USDA.': 'No USDA results.',

@@ -87,16 +87,19 @@ const macroKcal = (p, c, f) => Math.round(p * 4 + c * 4 + f * 9);   // 4/4/9 kca
 const macroGridHtml = (n = {}) => `<div class="grid2">${field('qaP', t('Protein'), inputNum(n.p), { unit: 'g' })}${field('qaC', t('Kohlenhydrate'), inputNum(n.c), { unit: 'g' })}${field('qaF', t('Fett'), inputNum(n.f), { unit: 'g' })}${field('qaK', t('Kalorien'), inputNum(n.kcal), { unit: 'kcal' })}</div><p class="hint" id="qaHint"></p>`;
 /** Wires the protein/carbs/fat/kcal fields of macroGridHtml: kcal follows the macros (4/4/9) until the user types their own
     value; clearing the kcal field makes it automatic again. vals() returns the numbers (kcal falls back to the macro sum). */
-function bindMacroKcal(sh, n = {}, hasEntry = false) {
-  const v = id => num($('#' + id, sh).value, 0, id === 'qaK' ? 20000 : 2000), calc = () => macroKcal(v('qaP'), v('qaC'), v('qaF'));
-  let override = hasEntry && Math.abs((n.kcal || 0) - calc()) > 1;
-  const hint = () => { const k = calc(), own = v('qaK');
-    $('#qaHint', sh).textContent = !override ? (k ? t('Kalorien aus den Makros berechnet (4/4/9)') : '') : (k && Math.abs(own - k) > 1 ? t('Eigener Wert · Makros ergeben ≈ {k} kcal · Feld leeren für automatisch', { k: de(k) }) : ''); };
-  const follow = () => { if (!override) { const k = calc(); $('#qaK', sh).value = k ? String(k) : ''; } hint(); };
-  $$('#qaP,#qaC,#qaF', sh).forEach(i => i.oninput = follow);
-  $('#qaK', sh).oninput = () => { override = $('#qaK', sh).value.trim() !== ''; if (!override) { follow(); return; } hint(); };
+const QA_IDS = { p: 'qaP', c: 'qaC', f: 'qaF', k: 'qaK', hint: 'qaHint' };
+/** ids: the element ids of the four fields and the hint line (the goals sheet uses its own).
+    startOverride: true/false to force the starting mode; default = "own value" only if the existing kcal differs from the macros. */
+function bindMacroKcal(sh, n = {}, hasEntry = false, ids = QA_IDS, startOverride = null) {
+  const el = k => $('#' + ids[k], sh), v = k => num(el(k).value, 0, k === 'k' ? 20000 : 2000), calc = () => macroKcal(v('p'), v('c'), v('f'));
+  let override = startOverride ?? (hasEntry && Math.abs((n.kcal || 0) - calc()) > 1);
+  const hint = () => { const k = calc(), own = v('k'), h = el('hint'); if (!h) return;
+    h.textContent = !k ? '' : Math.abs(own - k) <= 1 ? t('Kalorien aus den Makros berechnet (4/4/9)') : t('Eigener Wert · Makros ergeben ≈ {k} kcal · Feld leeren für automatisch', { k: de(k) }); };
+  const follow = () => { if (!override) { const k = calc(); el('k').value = k ? String(k) : ''; } hint(); };
+  for (const key of ['p', 'c', 'f']) el(key).oninput = follow;
+  el('k').oninput = () => { override = el('k').value.trim() !== ''; if (!override) { follow(); return; } hint(); };
   hint();
-  return { vals: () => { const p = v('qaP'), c = v('qaC'), f = v('qaF'); return { p, c, f, kcal: v('qaK') || macroKcal(p, c, f) }; } };
+  return { vals: () => { const p = v('p'), c = v('c'), f = v('f'); return { p, c, f, kcal: v('k') || macroKcal(p, c, f) }; } };
 }
 /** A quick entry is "what I ate", not per 100 g: save it as a custom food whose single Portion is exactly those numbers. */
 function quickToCustomFood(name, kcal, p, c, f) {

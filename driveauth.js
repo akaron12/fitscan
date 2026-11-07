@@ -2,7 +2,7 @@
 /* Google sign-in for Drive (Google Identity Services, token model, no backend).
    - The access token lives in memory only (never localStorage). It lasts about an hour.
    - signIn() must be called from a tap/click (browsers block popups otherwise).
-   - renew() tries without any prompt; it can fail, in which case the UI shows "tap to sign in".
+   - renew() (prompt "none") is kept for experiments but is NOT used by the app: on an iPhone home-screen app it only opens and closes a popup.
    Tested manually (spike/auth-v2.html showed the flow works in Safari and in the iPhone home-screen app). */
 const DriveAuth = (() => {
   const CLIENT_ID = '806305125271-jqii8egsi0ifs1e1di3bkhnta4ram8bj.apps.googleusercontent.com';   // public, not a secret

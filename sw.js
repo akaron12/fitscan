@@ -1,7 +1,7 @@
 // Service worker: keeps the app shell available offline (cache-first, same-origin).
 // V is the cache version. The deploy workflow stamps it from the commit (see .github/workflows/pages.yml), so every deploy
 // gets a fresh cache; bump it by hand only for local testing. tests/security.test.js checks that SHELL lists every file index.html loads.
-const V = 'fitscan-v11';
+const V = 'fitscan-v12';
 const SHELL = ['./', 'index.html', 'style.css', 'i18n.js', 'foods.js', 'icons.js', 'core.js', 'ui.js', 'usda.js', 'diary.js', 'food.js', 'progress.js', 'settings.js', 'dayfile.js', 'merge.js', 'driveclient.js', 'driveauth.js', 'sync.js', 'syncapp.js', 'docs/FORMAT.md', 'manifest.webmanifest', 'vendor/chart.umd.min.js', 'vendor/zxing.min.js', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-180.png'];
 self.addEventListener('install', e => {
   // One file at a time: a single missing file must not stop the whole install (cache.addAll is all-or-nothing).

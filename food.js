@@ -26,7 +26,7 @@ const actionRow = (id, icon, title, sub) => `<button class="row-item action" id=
 function foodRow(f) {
   const sub = f.src === 'recipe' ? esc(f.brand) : [esc(f.brand || tFood(f.cat)), `${de(f.n.kcal)} kcal/100 g`, f.serving?.g ? esc(tFood(f.serving.label)) : ''].filter(Boolean).join(' · ');
   const tag = f.src === 'custom' ? `<span class="tag">${t('Eigenes')}</span>` : '';
-  return `<div class="row-item food" data-fid="${esc(f.id)}">${multi ? `<span class="ck${picked.has(f.id) ? ' on' : ''}">${I('check')}</span>` : ''}${foodIcon(f)}<div class="grow"><div class="nm">${esc(f.name)}${nsMini(f.ns)}${tag}</div><div class="sub">${sub}</div></div>${multi ? '' : `<button class="add-btn" data-qa="${esc(f.id)}" aria-label="${t('Schnell hinzufügen')}">${I('plus')}</button>`}</div>`;
+  return `<div class="row-item food" data-fid="${esc(f.id)}">${multi ? `<span class="ck${picked.has(f.id) ? ' on' : ''}">${I('check')}</span>` : ''}${foodIcon(f)}<div class="grow"><div class="nm">${esc(f.name)}${nsMini(f.ns)}${tag}</div><div class="sub">${sub}</div></div>${multi ? '' : `<span class="row-acts"><button class="star-btn${S.favorites[f.id] ? ' on' : ''}" data-star="${esc(f.id)}" aria-label="${t('Favorit')}" aria-pressed="${S.favorites[f.id] ? 'true' : 'false'}">${I('star', S.favorites[f.id] ? 'fill' : '')}</button><button class="add-btn" data-qa="${esc(f.id)}" aria-label="${t('Schnell hinzufügen')}">${I('plus')}</button></span>`}</div>`;
 }
 function bindList(root, list) {
   const find = id => list.find(x => x.id === id);
@@ -34,6 +34,13 @@ function bindList(root, list) {
     const f = find(r.dataset.fid); if (!f) return;
     if (f.src === 'off' && f.code) { S.products[f.code] ||= f; save(); }
     else if (f.src === 'usda') { S.products[f.id] ||= f; save(); }   // keep it searchable offline
+    const star = e.target.closest('[data-star]');
+    if (star) {   // star a food straight from the list (no need to open it)
+      const on = !S.favorites[f.id]; if (on) setFavorite(f); else removeFavorite(f.id); save();
+      star.classList.toggle('on', on); star.setAttribute('aria-pressed', on ? 'true' : 'false'); star.innerHTML = I('star', on ? 'fill' : '');
+      toast(t(on ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')); if (!on && ui.libTab === 'fav' && !ui.query.trim()) fillLibList();
+      return;
+    }
     if (e.target.closest('[data-qa]')) return quickLog(f);
     if (!multi) return foodSheet(f);
     if (picked.has(f.id)) picked.delete(f.id); else picked.set(f.id, f);
@@ -50,7 +57,7 @@ function fillLibList() {
   if (ui.query.trim()) return doSearch(true);
   let list = [], top = '', empty = null, grouped = false;
   switch (ui.libTab) {
-    case 'recent': top = actionRow('aQuick', 'zap', t('Schnelleintrag'), t('Nur Kalorien oder Makros')); list = S.recents; empty = ['clock', t('Hier erscheinen zuletzt eingetragene Lebensmittel.')]; break;
+    case 'recent': top = actionRow('aQuick', 'zap', t('Schnelleintrag'), t('Nur Kalorien oder Makros')) + (S.recents.length ? '' : actionRow('aBasics', 'book', t('Eingebaute Lebensmittel durchsuchen'), t('Über 500 Lebensmittel. Mit dem Stern merkst du Favoriten.'))); list = S.recents; empty = ['clock', t('Hier erscheinen zuletzt eingetragene Lebensmittel.')]; break;
     case 'fav': list = Object.values(S.favorites); empty = ['star', t('Noch keine Favoriten. Tippe beim Lebensmittel auf den Stern.')]; break;
     case 'scans': list = dedupe(S.scanHistory.map(h => Object.values(S.foods).find(f => f.code === h.code) || S.products[h.code]).filter(Boolean)); empty = ['scan', t('Hier erscheinen deine gescannten Produkte – auch offline verfügbar.')]; break;
     case 'custom': top = actionRow('aCustom', 'plus', t('Eigenes Lebensmittel anlegen'), t('Mit Nährwerten von der Verpackung')); list = Object.values(S.foods); break;
@@ -62,6 +69,7 @@ function fillLibList() {
   else rows = list.map(foodRow).join('');
   el.innerHTML = (top ? `<div class="card list">${top}</div>` : '') + (list.length ? `<div class="card list">${rows}</div>` : empty ? emptyState(...empty) : '');
   if ($('#aQuick')) $('#aQuick').onclick = () => quickAddSheet(ui.targetMeal);
+  if ($('#aBasics')) $('#aBasics').onclick = () => { ui.libTab = 'base'; rerender(); };
   if ($('#aCustom')) $('#aCustom').onclick = () => customFoodSheet();
   if ($('#aRecipe')) $('#aRecipe').onclick = () => recipeSheet();
   bindList(el, list);

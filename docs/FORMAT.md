@@ -72,7 +72,7 @@ entries:
 Unknown keys are allowed and are kept by the app.
 
 ## Rules for Claude
-1. **Always re-read the day file right before you write it.** Never write from an older copy. The user may have confirmed meals since you last read it.
+1. **Always re-read the day file right before you write it.** Never write from an older copy. The user may have confirmed meals since you last read it. **Read the raw file:** with the Google Drive connector use `download_file_content` (it returns base64: decode it), not `read_file_content`, which renders markdown and flattens the indentation this format depends on.
 2. **Only add or change `planned` entries.** Never edit, delete or re-order `eaten` entries, and never turn `eaten` back into `planned`. The app ignores such changes.
 3. **Keep everything you do not understand**: other entries, ids, `rev`, `deleted`, unknown keys, text outside the block.
 4. To remove a planned meal, delete its list item. The app only treats an explicit `deleted: true` as a deletion elsewhere, so a missing item may reappear if the app still has it. To be sure, leave the entry and set `note: "cancelled"`, or ask the user.
@@ -80,6 +80,7 @@ Unknown keys are allowed and are kept by the app.
 6. Check the arithmetic: roughly `kcal ≈ 4*p + 4*c + 9*f`.
 7. If a file or entry is unclear, do not guess. Leave it untouched and tell the user.
 8. If `format:` is higher than `meal-log/1`, do not write to the file.
+9. **If your Drive tool can only create files (it cannot change the content of an existing file), create a new file.** Name it exactly `YYYY-MM-DD.md` in this folder. A second file with the same name is fine and expected. Put the **whole day** in it: first re-read the current file, copy every existing entry unchanged (keep `id`, `status`, `rev`, `note` and any other keys), then add or change only your `planned` entries. The app notices the duplicate, merges the two files (nothing already eaten is lost, and an `eaten` entry always wins over a `planned` one), keeps its own file and moves the extra copy to the Drive trash. Create the file as plain text (markdown), not as a Google Doc: with the Drive connector set `contentMimeType` to `text/markdown` and `disableConversionToGoogleType` to `true`. Do not edit or trash the app's files by other means.
 
 ## What the app does with your entries
 - Planned entries show dimmed in the diary. They do not count toward the daily totals until the user confirms them with one tap.

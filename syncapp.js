@@ -7,7 +7,7 @@ const SyncApp = (() => {
   const drive = DriveClient.create({ fetch: (...a) => fetch(...a), getToken: DriveAuth.getToken, store: DriveClient.localStore('fitscan.drive.') });
   const specText = async () => { const r = await fetch('docs/FORMAT.md', { cache: 'no-cache' }); return r.ok ? r.text() : null; };
   const engine = Sync.create({ drive, getS: () => S, persist: () => save(true), uid, today, specText });
-  let timer = null, lastRenew = 0, oldDaysAsked = new Set();
+  let timer = null, oldDaysAsked = new Set();
 
   // ---------- running a sync ----------
   async function sync(reason) {
@@ -18,16 +18,13 @@ const SyncApp = (() => {
     paint(); refreshCard();
     return r;
   }
-  /** Try to get a token without a prompt (works only if Google still has a session); never throws. */
-  async function quietRenew() {
-    if (!flag.get() || DriveAuth.getToken() || Date.now() - lastRenew < 60e3) return;
-    lastRenew = Date.now(); try { await DriveAuth.renew(); } catch {}
-  }
+  // No automatic "quiet" token renewal: tested on an iPhone home-screen app, it only makes a Google popup flash open and close
+  // (popup_closed) without ever returning a token. When the hour is up the pill says "tap to sign in", and one tap does it.
   async function connect() {
     try { await DriveAuth.signIn(); flag.set(); } catch (e) { if (e.kind !== 'superseded') toast(t('Anmeldung fehlgeschlagen: {m}', { m: e.message })); paint(); return; }
     await sync('sign-in');
   }
-  async function wake(reason) { await quietRenew(); await sync(reason); }
+  const wake = reason => sync(reason);   // sync() does nothing while there is no valid token; the pill shows what is waiting
   window.onLocalSave = () => { clearTimeout(timer); paint(); timer = setTimeout(() => sync('edit'), 2500); };
   window.onRendered = () => {   // looking at a day outside the sync window (14 days back, 7 ahead): fetch it once
     if (ui.tab === 'diary' && (ui.date < addDays(today(), -13) || ui.date > addDays(today(), 7)) && !oldDaysAsked.has(ui.date) && DriveAuth.getToken()) { oldDaysAsked.add(ui.date); sync('old-day'); }

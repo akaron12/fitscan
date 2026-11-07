@@ -68,9 +68,8 @@ function goalsSheet() {
   openSheet(`${sheetHead(t('Tagesziele'), t('Kalorien und Makros pro Tag.'))}<div class="form">
     <div class="grid2">${field('gK', t('Kalorien'), g.kcal, { unit: 'kcal' })}${field('gP', t('Protein'), g.p, { unit: 'g' })}${field('gC', t('Kohlenhydrate'), g.c, { unit: 'g' })}${field('gF', t('Fett'), g.f, { unit: 'g' })}</div>
     <p class="hint" id="gSum"></p><button class="btn block" id="gSave">${t('Speichern')}</button></div>`, sh => {
-    const gs = () => { const k = num($('#gP').value) * 4 + num($('#gC').value) * 4 + num($('#gF').value) * 9, goal = num($('#gK').value);
-      $('#gSum').textContent = t('Makros ergeben {a} kcal (Ziel {b} kcal)', { a: de(k), b: de(goal) }); $('#gSum').classList.toggle('warn', Math.abs(k - goal) > goal * 0.05); };
-    $$('input', sh).forEach(i => i.oninput = gs); gs();
+    // calories follow the macros (4/4/9) as soon as one of them is edited; type your own calories to override, clear the field for automatic
+    bindMacroKcal(sh, g, true, { p: 'gP', c: 'gC', f: 'gF', k: 'gK', hint: 'gSum' }, false);
     $('#gSave').onclick = () => { const k = num($('#gK').value, 0, 10000); if (k < 800) return toast(t('Bitte mindestens 800 kcal'));
       S.goals = { kcal: Math.round(k), p: Math.round(num($('#gP').value, 0, 1000)), c: Math.round(num($('#gC').value, 0, 1500)), f: Math.round(num($('#gF').value, 0, 1000)), manual: true, rev: (S.goals.rev || 0) + 1 };
       save(); closeSheet(); rerender(); toast(t('Gespeichert')); };
