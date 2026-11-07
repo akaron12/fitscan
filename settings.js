@@ -18,6 +18,9 @@ function renderProfile(v) {
   <div class="card list"><div class="row-item"><span class="grow nm">${t('Design')}</span>${seg('sTheme', [['light', t('Hell')], ['dark', t('Dunkel')], ['system', t('Auto')]], st.theme, 'sm')}</div>
     <div class="row-item"><span class="grow nm">${t('Sprache')}</span>${seg('sLang', [['de', 'Deutsch'], ['en', 'English']], LANG, 'sm')}</div></div>
 
+  <div class="sec"><h4>${t('Synchronisation')}</h4></div>
+  <div class="card list" id="syncCard">${window.syncCardHtml ? syncCardHtml() : ''}</div>
+
   <div class="sec"><h4>${t('Daten')}</h4></div>
   <div class="card list">${navRow('exJson', 'download', t('Backup exportieren'), t('Alle Daten als JSON-Datei'))}
     <label class="row-item nav"><span class="row-ic">${I('upload')}</span><span class="grow"><span class="nm">${t('Backup importieren')}</span><span class="sub">${t('Ersetzt die aktuellen Daten')}</span></span>${I('chevR', 'chev')}<input type="file" id="imJson" accept=".json,application/json" hidden></label>
@@ -25,7 +28,7 @@ function renderProfile(v) {
   <div class="card list"><button class="row-item danger-row" id="wipe">${t('Alle Daten löschen')}</button></div>
   <p class="foot">${t('Alles bleibt auf diesem Gerät – kein Konto, keine Cloud, keine Paywall.')}<br>${t('{p} Produkte offline · {b} Basis-Lebensmittel', { p: Object.keys(S.products).length, b: BASE_FOODS.length })} · <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a></p>`;
 
-  $('#pGoals').onclick = goalsSheet;
+  $('#pGoals').onclick = goalsSheet; window.bindSyncCard?.();
   const sv = () => { st.beep = $('#sBeep').checked; st.continuousScan = $('#sCont').checked; save(); };
   $$('#sBeep,#sCont', v).forEach(i => i.onchange = sv);
   bindSeg(v, 'sTheme', th => { st.theme = th; save(); applyTheme(); });
@@ -40,6 +43,7 @@ function renderProfile(v) {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     let data; try { const j = JSON.parse(await f.text()); data = j.data || j; if (!data.entries || !data.goals) throw 0; } catch { return toast(t('Ungültige Backup-Datei')); }
     if (!await confirmSheet({ title: t('Backup importieren?'), text: t('Deine aktuellen Daten werden durch das Backup ersetzt.'), ok: t('Importieren') })) return;
+    delete data.sync;   // sync bookkeeping belongs to this device only
     const keepLang = S.settings.lang; S = sanitize(data); S.settings.lang ||= keepLang; save(); setLang(S.settings.lang || LANG); applyTheme(); rerender(); toast(t('Backup importiert'));
   };
   $('#wipe').onclick = async () => {
@@ -58,7 +62,7 @@ function goalsSheet() {
       $('#gSum').textContent = t('Makros ergeben {a} kcal (Ziel {b} kcal)', { a: de(k), b: de(goal) }); $('#gSum').classList.toggle('warn', Math.abs(k - goal) > goal * 0.05); };
     $$('input', sh).forEach(i => i.oninput = gs); gs();
     $('#gSave').onclick = () => { const k = num($('#gK').value, 0, 10000); if (k < 800) return toast(t('Bitte mindestens 800 kcal'));
-      S.goals = { kcal: Math.round(k), p: Math.round(num($('#gP').value, 0, 1000)), c: Math.round(num($('#gC').value, 0, 1500)), f: Math.round(num($('#gF').value, 0, 1000)), manual: true };
+      S.goals = { kcal: Math.round(k), p: Math.round(num($('#gP').value, 0, 1000)), c: Math.round(num($('#gC').value, 0, 1500)), f: Math.round(num($('#gF').value, 0, 1000)), manual: true, rev: (S.goals.rev || 0) + 1 };
       save(); closeSheet(); rerender(); toast(t('Gespeichert')); };
   });
 }

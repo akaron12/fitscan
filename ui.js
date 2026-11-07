@@ -65,6 +65,7 @@ function render() {
   $('#pageTitle').textContent = t(TITLES[ui.tab]); $('#pageSub').textContent = ''; $('#topActions').innerHTML = '';
   ({ diary: renderDiary, library: renderLibrary, progress: renderProgress, profile: renderProfile })[ui.tab]($('#view'));
   $('#pageSub').classList.toggle('hidden', !$('#pageSub').textContent);
+  try { window.onRendered?.(); } catch {}
 }
 function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
 function topAction(label, fn) { const b = Object.assign(document.createElement('button'), { className: 'top-btn', textContent: label }); b.onclick = fn; $('#topActions').appendChild(b); }

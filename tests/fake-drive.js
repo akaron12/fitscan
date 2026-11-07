@@ -27,7 +27,7 @@ function FakeDrive({ pageSize = 100 } = {}) {
     const u = parseUrl(url), path = u.pathname, method = (init.method || 'GET').toUpperCase(), headers = init.headers || {};
     d.calls.push({ method, path, query: u.search, auth: headers.Authorization });
     if (d.networkDown) throw new TypeError('Failed to fetch');
-    if (d.beforeRequest) await d.beforeRequest({ method, path, init });
+    if (d.beforeRequest) await d.beforeRequest({ method, path, query: u.search, init });
     if (d.failQueue.length) { const f = d.failQueue.shift(); return resp(f.status, f.body || { error: { message: 'injected ' + f.status } }); }
     if (headers.Authorization !== 'Bearer ' + d.token) return resp(401, { error: { message: 'Invalid Credentials' } });
     let m;

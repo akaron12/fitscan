@@ -2,7 +2,15 @@
 /* FitScan i18n: German source strings are the keys; t() looks up English and fills {placeholders}. */
 const EN = {
   // Navigation & common
-  'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Einstellungen': 'Settings', 'Kalorien- und Makroziele eintragen': 'Enter your calorie and macro goals', 'Kalorien und Makros pro Tag.': 'Calories and macros per day.',
+  'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Einstellungen': 'Settings',
+  'Mit Drive verbinden': 'Connect Drive', 'Synchronisiere…': 'Syncing…', '{n} nicht synchronisiert · zum Anmelden tippen': '{n} not synced · tap to sign in', 'Zum Anmelden tippen': 'Tap to sign in', '{n} warten · offline': '{n} waiting · offline', 'Offline': 'Offline',
+  'Sync-Fehler · tippen': 'Sync error · tap', '{n} nicht synchronisiert': '{n} not synced', 'Synchronisiert': 'Synced', 'Synchronisation': 'Sync', 'Jetzt synchronisieren': 'Sync now', 'Mit Google Drive verbinden': 'Connect Google Drive',
+  'Verbunden': 'Connected', 'Anmeldung abgelaufen': 'Sign-in expired', 'Nicht verbunden': 'Not connected', 'Zuletzt {t}': 'Last {t}', '{d}: nicht synchronisiert ({w})': '{d}: not synced ({w})', 'Anmeldung fehlgeschlagen: {m}': 'Sign-in failed: {m}',
+  'Vorschläge von außerhalb': 'Suggested changes', 'Änderungen aus Drive, die deine Einträge nicht überschreiben durften': 'Changes from Drive that were not allowed to overwrite your entries', 'Abmelden': 'Sign out',
+  'Der Zugriff bleibt in deinem Google-Konto, bis du ihn dort entfernst': 'Access stays in your Google account until you remove it there', 'Abgemeldet': 'Signed out', 'Verwerfen': 'Dismiss',
+  'Diese Änderungen kamen aus Drive und haben deine Einträge nicht überschrieben.': 'These changes came from Drive and did not overwrite your entries.', 'Keine Vorschläge.': 'No suggestions.',
+  'Planned change to an entry you already ate': 'Planned change to an entry you already ate', 
+ 'Kalorien- und Makroziele eintragen': 'Enter your calorie and macro goals', 'Kalorien und Makros pro Tag.': 'Calories and macros per day.',
   'Tagebuch, eigene Lebensmittel und Einstellungen werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden.': 'Your diary, custom foods and settings will be removed from this device. This cannot be undone.', 'Scannen': 'Scan', 'Heute': 'Today', 'Gestern': 'Yesterday', 'Morgen': 'Tomorrow',
   'Abbrechen': 'Cancel', 'Schließen': 'Close', 'Speichern': 'Save', 'Löschen': 'Delete', 'Hinzufügen': 'Add', 'Weiter': 'Next', 'Zurück': 'Back', 'Fertig': 'Done', 'Auswählen': 'Select',
   'Rückgängig': 'Undo', 'Gespeichert': 'Saved', 'Gelöscht': 'Deleted', 'Details': 'Details', 'Datum': 'Date', 'Name': 'Name', 'Entfernen': 'Remove', 'Laden': 'Load', 'Importieren': 'Import',

@@ -38,6 +38,10 @@ function sanitize(o) {
   for (const k of ['goals', 'entries', 'foods', 'products', 'recipes', 'favorites', 'settings']) if (!isObj(s[k])) s[k] = DEFAULT()[k];
   for (const k of ['recents', 'scanHistory']) if (!Array.isArray(s[k])) s[k] = [];
   for (const k of ['kcal', 'p', 'c', 'f']) s.goals[k] = Number.isFinite(+s.goals[k]) ? +s.goals[k] : DEFAULT().goals[k];
+  if (Number.isFinite(+s.goals.rev)) s.goals.rev = +s.goals.rev; else delete s.goals.rev;
+  // Drive sync bookkeeping (see sync.js). Never copied between devices: a backup import or wipe resets it.
+  const sy = isObj(s.sync) ? s.sync : {};
+  s.sync = { synced: !!sy.synced, lastSync: +sy.lastSync || 0, days: isObj(sy.days) ? sy.days : {}, suggestions: Array.isArray(sy.suggestions) ? sy.suggestions : [], ...(Number.isFinite(+sy.goalsSyncedRev) ? { goalsSyncedRev: +sy.goalsSyncedRev } : {}) };
   for (const [dk, es] of Object.entries(s.entries)) {
     if (!Array.isArray(es)) { delete s.entries[dk]; continue; }
     const seen = new Set();
@@ -64,11 +68,15 @@ function sanitize(o) {
   // v6: new light design – earlier versions defaulted to dark, so switch everyone to light once.
   if (st.ui !== 6) { st.theme = 'light'; st.ui = 6; }
   if (!['light', 'dark', 'system'].includes(st.theme)) st.theme = 'light';
-  s.version = 5;
+  s.version = 6;
   return s;
 }
 function load() { try { return sanitize(JSON.parse(localStorage.getItem(KEY))); } catch { return DEFAULT(); } }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { toast(t('Speicher voll – bitte Backup exportieren')); } }
+// save(true) = quiet: used by the sync engine so its own writes do not trigger another sync.
+function save(quiet) {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { toast(t('Speicher voll – bitte Backup exportieren')); }
+  if (quiet !== true) try { window.onLocalSave?.(); } catch {}
+}
 let S = load();
 
 // ---------- Nutrition ----------
@@ -101,7 +109,7 @@ function touch(e, patch = {}) { Object.assign(e, patch); e.rev = (+e.rev || 0) +
 function removeEntry(date, e) {
   const arr = S.entries[date] || [], i = arr.indexOf(e); if (i < 0) return -1;
   arr.splice(i, 1); touch(e);
-  ((S.tombstones[date] ||= {})[e.id] = { rev: e.rev, at: Date.now() });
+  ((S.tombstones[date] ||= {})[e.id] = { rev: e.rev, at: Date.now(), meal: e.meal });
   return i;
 }
 function restoreEntry(date, e, i = -1) {
