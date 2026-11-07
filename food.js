@@ -33,6 +33,7 @@ function bindList(root, list) {
   $$('[data-fid]', root).forEach(r => r.onclick = e => {
     const f = find(r.dataset.fid); if (!f) return;
     if (f.src === 'off' && f.code) { S.products[f.code] ||= f; save(); }
+    else if (f.src === 'usda') { S.products[f.id] ||= f; save(); }   // keep it searchable offline
     if (e.target.closest('[data-qa]')) return quickLog(f);
     if (!multi) return foodSheet(f);
     if (picked.has(f.id)) picked.delete(f.id); else picked.set(f.id, f);
@@ -74,17 +75,30 @@ function doSearch(now) {
     $('#aCode').onclick = () => handleBarcode(q); if (now) handleBarcode(q); return;
   }
   const loc = localSearch(q).slice(0, 12);
+  const hasKey = !!USDA.getKey();   // generic foods (no barcode) come from USDA; packaged products from Open Food Facts
   el.innerHTML = `${loc.length ? `<div class="sec"><h4>${t('Bibliothek & Eigene')}</h4></div><div class="card list" id="locRes">${loc.map(foodRow).join('')}</div>` : ''}
+    ${hasKey ? `<div class="sec"><h4>USDA FoodData Central</h4></div><div id="usdaRes"><div class="spinner"></div></div>`
+      : `<button class="card banner" id="usdaOff"><span class="banner-ic">${I('database')}</span><span class="grow"><b>${t('USDA-Suche aktivieren')}</b><span class="sub">${t('Für Lebensmittel ohne Barcode, z. B. „Hähnchenbrust roh“: kostenlosen API-Key in den Einstellungen eintragen')}</span></span>${I('chevR', 'chev')}</button>`}
     <div class="sec"><h4>Open Food Facts</h4></div><div id="offRes"><div class="spinner"></div></div>`;
   if (loc.length) bindList($('#locRes'), loc);
-  searchTimer = setTimeout(async () => {
-    const ctl = searchCtl = new AbortController();
-    try {
-      const res = await searchOFF(q, ctl.signal), box = $('#offRes'); if (ui.query.trim() !== q || !box) return;
-      box.innerHTML = res.length ? `<div class="card list">${res.map(foodRow).join('')}</div>` : `<p class="hint">${t('Keine Produkte gefunden.')}</p>`;
-      bindList(box, res);
-    } catch (e) { if (e.name !== 'AbortError' && $('#offRes')) $('#offRes').innerHTML = `<p class="hint">${t('Online-Suche gerade nicht erreichbar. Lokale Treffer funktionieren trotzdem.')}</p>`; }
-  }, now ? 0 : 400);
+  if ($('#usdaOff')) $('#usdaOff').onclick = () => go('profile');
+  searchTimer = setTimeout(() => { const ctl = searchCtl = new AbortController(); showOFF(q, ctl); if (hasKey) showUSDA(q, ctl); }, now ? 0 : 400);
+}
+async function showOFF(q, ctl) {
+  try {
+    const res = await searchOFF(q, ctl.signal), box = $('#offRes'); if (ui.query.trim() !== q || !box) return;
+    box.innerHTML = res.length ? `<div class="card list">${res.map(foodRow).join('')}</div>` : `<p class="hint">${t('Keine Produkte gefunden.')}</p>`;
+    bindList(box, res);
+  } catch (e) { if (e.name !== 'AbortError' && $('#offRes')) $('#offRes').innerHTML = `<p class="hint">${t('Online-Suche gerade nicht erreichbar. Lokale Treffer funktionieren trotzdem.')}</p>`; }
+}
+const USDA_MSG = { key: 'USDA hat den API-Key abgelehnt. Bitte in den Einstellungen prüfen.', rate: 'USDA-Limit erreicht (ca. 1.000 Suchen pro Stunde). Später erneut versuchen.', nokey: 'Kein USDA-API-Key hinterlegt.',
+  network: 'USDA gerade nicht erreichbar. Lokale Treffer funktionieren trotzdem.', http: 'USDA-Suche gerade nicht möglich.' };
+async function showUSDA(q, ctl) {
+  try {
+    const res = rank(await USDA.search(q, ctl.signal), q), box = $('#usdaRes'); if (ui.query.trim() !== q || !box) return;
+    box.innerHTML = res.length ? `<div class="card list">${res.map(foodRow).join('')}</div>` : `<p class="hint">${t('Keine Treffer bei USDA.')}</p>`;
+    bindList(box, res);
+  } catch (e) { if (e.name === 'AbortError') return; const box = $('#usdaRes'); if (box) box.innerHTML = `<p class="hint">${t(USDA_MSG[e.kind] || USDA_MSG.http)}</p>`; }
 }
 
 // ---------- Multi-select ----------
@@ -271,7 +285,11 @@ async function serialAdd(code) {
     addEntry(p, pt.g, pt.label, meal, ui.date, { unit: pt.unit, qty: pt.qty });
     $('#scanTray').insertAdjacentHTML('afterbegin', `<div class="tray-item">${I('check')}<span class="grow">${esc(p.name)}</span><b>${de(nutr(p, pt.g).kcal)} kcal</b></div>`);
     scanStatus(t('Hinzugefügt – nächsten Barcode scannen'));
-  } catch { scanStatus(t('Keine Verbindung')); }
+  } catch {   // no connection: note the barcode as a placeholder row and keep scanning
+    addPending(code, ui.targetMeal || mealDefault(), ui.date);
+    $('#scanTray').insertAdjacentHTML('afterbegin', `<div class="tray-item">${I('clock')}<span class="grow">Barcode ${esc(code)}</span><b>⏳</b></div>`);
+    scanStatus(t('Offline – wird später nachgeschlagen'));
+  }
 }
 $('#scanClose').onclick = closeScanner;
 $('#scanMode').onclick = () => { S.settings.continuousScan = !S.settings.continuousScan; save(); scanModeUI(); };
@@ -307,7 +325,52 @@ async function handleBarcode(code) {
     else if (cached && product.src === 'off' && !navigator.onLine) toast(t('Aus lokalem Speicher (offline verfügbar)'));
     foodSheet(product);
   } catch (e) {
-    openSheet(`${sheetHead(t('Keine Verbindung'))}<p class="lead">${t('Open Food Facts ist gerade nicht erreichbar. Versuche es gleich nochmal oder lege das Produkt selbst an.')}</p>
-      <div class="stack"><button class="btn block" id="nfRetry">${t('Erneut versuchen')}</button><button class="btn block secondary" id="nfAdd">${t('Selbst anlegen')}</button></div>`, () => { $('#nfRetry').onclick = () => handleBarcode(code); $('#nfAdd').onclick = () => customFoodSheet(null, code); });
+    const off = navigator.onLine === false;   // offline: noting the barcode for later is the main action
+    openSheet(`${sheetHead(t('Keine Verbindung'))}<p class="lead">${t('Open Food Facts ist gerade nicht erreichbar. Versuche es gleich nochmal, merke den Barcode für später vor oder lege das Produkt selbst an.')}</p>
+      <div class="stack"><button class="btn block${off ? '' : ' secondary'}" id="nfLater">${t('Später nachschlagen')}</button><button class="btn block${off ? ' secondary' : ''}" id="nfRetry">${t('Erneut versuchen')}</button><button class="btn block secondary" id="nfAdd">${t('Selbst anlegen')}</button></div>`,
+      () => { $('#nfLater').onclick = () => pendingSheet(code); $('#nfRetry').onclick = () => handleBarcode(code); $('#nfAdd').onclick = () => customFoodSheet(null, code); });
   }
 }
+
+// ---------- Offline barcodes: a placeholder row now, looked up automatically when back online ----------
+const pendingFood = (code, n = {}) => ({ id: 'pending:' + code, src: 'pending', code, name: 'Barcode ' + code, brand: '', img: '', cat: '', serving: null,
+  n: { kcal: n.kcal || 0, p: n.p || 0, c: n.c || 0, f: n.f || 0, fib: 0, sug: 0, salt: 0 } });
+/** Values typed by the user are for the amount eaten; the placeholder amount is 100 g, so they are stored 1:1. */
+function addPending(code, meal, date, n = null) {
+  return addEntry(pendingFood(code, n || {}), 100, '100 g', meal, date, { pending: { manual: !!(n && n.kcal > 0) } });
+}
+function pendingSheet(code) {
+  let meal = ui.targetMeal || mealDefault(); const date = ui.date;
+  openSheet(`${sheetHead(t('Barcode {c} vormerken', { c: esc(code) }), t('Der Eintrag erscheint sofort im Tagebuch und wird nachgeschlagen, sobald du wieder online bist.'))}
+    <div class="form"><p class="hint">${t('Optional: Werte für die gegessene Menge schon jetzt eintragen. Eigene Werte haben später Vorrang, nur der Name wird ergänzt.')}</p>
+    ${macroGridHtml({})}${mealSeg(meal, 'pbM')}<button class="btn block" id="pbAdd">${t('Zum Tagebuch hinzufügen')}</button></div>`, sh => {
+    const mk = bindMacroKcal(sh, {}, false); bindSeg(sh, 'pbM', m => meal = m);
+    $('#pbAdd').onclick = () => {
+      const { p, c, f, kcal } = mk.vals(), e = addPending(code, meal, date, p || c || f || kcal ? { kcal, p, c, f } : null);
+      closeSheet(); ui.targetMeal = null; go('diary', { date });
+      undoable(t('Barcode {c} vorgemerkt', { c: code }), () => deleteSilently(date, e));
+    };
+  });
+}
+let resolving = false;
+/** Looks up every placeholder entry. Your own numbers win (only name/brand/image are filled in); otherwise the product's
+    nutrition replaces the zeros. Network errors leave the placeholder for the next attempt; "not found" is remembered. */
+async function resolvePending() {
+  if (resolving || navigator.onLine === false) return; resolving = true; let found = 0, missing = 0;
+  try {
+    for (const es of Object.values(S.entries)) for (const e of es) {
+      if (e.food?.src !== 'pending' || e.pending?.notFound) continue;
+      let res; try { res = await lookupBarcode(e.food.code); } catch { continue; }
+      if (!res.product) { e.pending = { ...(e.pending || {}), notFound: true }; missing++; continue; }
+      const p = res.product, manual = e.pending?.manual ?? (e.food.n.kcal > 0);
+      const snap = { id: p.id, name: p.name, brand: p.brand || '', img: p.img || '', cat: p.cat || '', n: manual ? e.food.n : p.n, serving: p.serving || null, src: p.src, code: p.code };
+      if (p.micro && !manual) snap.micro = p.micro; if (p.ns) snap.ns = p.ns; if (p.nova) snap.nova = p.nova;
+      touch(e, { food: snap }); delete e.pending; S.recents = [snap, ...S.recents.filter(x => x.id !== snap.id)].slice(0, 40); found++;
+    }
+  } finally { resolving = false; }
+  if (found || missing) { save(); if (!sheetOpen() && !$('#onb')) rerender(); }
+  if (found) toast(t('{n} Barcode(s) nachgeschlagen – bitte Menge prüfen', { n: found }));
+}
+addEventListener('online', () => resolvePending());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) resolvePending(); });
+setTimeout(resolvePending, 2000);

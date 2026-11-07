@@ -100,7 +100,7 @@ function addEntry(food, g, label, meal, date = ui.date, extra = {}) {
   if (food.micro) snap.micro = food.micro; if (food.ns) snap.ns = food.ns; if (food.nova) snap.nova = food.nova;
   const e = { id: uid(), meal, status: 'eaten', rev: 1, g, label, food: snap, ...extra };
   (S.entries[date] ||= []).push(e);
-  if (food.src !== 'quick') S.recents = [snap, ...S.recents.filter(x => x.id !== snap.id)].slice(0, 40);
+  if (food.src !== 'quick' && food.src !== 'pending') S.recents = [snap, ...S.recents.filter(x => x.id !== snap.id)].slice(0, 40);
   save(); return e;
 }
 // Every app-side change to an entry bumps its revision, so a later sync can order edits without trusting device clocks.
@@ -196,7 +196,7 @@ function scoreFood(f, q) {
 const rank = (list, q) => list.map(f => [scoreFood(f, q), f]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
 function localSearch(q) {
   const nq = norm(q).split(/\s+/).filter(Boolean);
-  const pool = dedupe([...Object.values(S.recipes).map(recipeFood), ...Object.values(S.foods), ...Object.values(S.products), ...BASE_FOODS].filter(Boolean));
+  const pool = dedupe([...Object.values(S.recipes).map(recipeFood), ...Object.values(S.foods), ...Object.values(S.products), ...S.recents, ...BASE_FOODS].filter(Boolean));   // recents: everything you logged is searchable offline
   return rank(pool.filter(f => nq.every(w => norm(f.name + ' ' + (f.brand || '') + ' ' + (f.cat || '')).includes(w))), q).slice(0, 40);
 }
 function recipeFood(r) {

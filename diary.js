@@ -56,8 +56,8 @@ function renderDiary(v) {
   $$('[data-eid]', v).forEach(el => el.onclick = () => { const e = es.find(x => x.id === el.dataset.eid); if (!e) return; e.quick ? quickAddSheet(e.meal, e) : foodSheet(e.food, { entry: e, date: d }); });
 }
 function entryRow(e) {
-  const n = nutr(e.food, e.g), planned = !isEaten(e), note = e.x?.note ? ` · ${esc(e.x.note)}` : '';
-  return `<div class="row-item entry${planned ? ' planned' : ''}" data-eid="${e.id}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${planned ? `<span class="plan-tag">${t('Geplant')}</span> ` : ''}${esc(entryLabel(e))} · P ${r0(n.p)} · ${t('K')} ${r0(n.c)} · F ${r0(n.f)}${note}</div></div><div class="kcal">${de(n.kcal)}</div>${planned ? `<button class="chk" data-chk="${e.id}" aria-label="${t('Als gegessen bestätigen')}" title="${t('Als gegessen bestätigen')}">${I('check')}</button>` : ''}</div>`;
+  const n = nutr(e.food, e.g), planned = !isEaten(e), note = e.x?.note ? ` · ${esc(e.x.note)}` : '', pend = e.food.src === 'pending';
+  return `<div class="row-item entry${planned ? ' planned' : ''}" data-eid="${e.id}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${planned ? `<span class="plan-tag">${t('Geplant')}</span> ` : ''}${pend ? `<span class="plan-tag">${e.pending?.notFound ? t('Nicht gefunden') : '⏳ ' + t('Wartet auf Netz')}</span> ` : ''}${esc(entryLabel(e))} · P ${r0(n.p)} · ${t('K')} ${r0(n.c)} · F ${r0(n.f)}${note}</div></div><div class="kcal">${de(n.kcal)}</div>${planned ? `<button class="chk" data-chk="${e.id}" aria-label="${t('Als gegessen bestätigen')}" title="${t('Als gegessen bestätigen')}">${I('check')}</button>` : ''}</div>`;
 }
 /** Eaten totals drive the ring; planned meals only show as a projection. */
 function projLine(tt, pt, g) {
@@ -83,27 +83,49 @@ function deleteEntry(date, e) {
 }
 
 // ---------- Quick add ----------
+const macroKcal = (p, c, f) => Math.round(p * 4 + c * 4 + f * 9);   // 4/4/9 kcal per gram
+const macroGridHtml = (n = {}) => `<div class="grid2">${field('qaP', t('Protein'), inputNum(n.p), { unit: 'g' })}${field('qaC', t('Kohlenhydrate'), inputNum(n.c), { unit: 'g' })}${field('qaF', t('Fett'), inputNum(n.f), { unit: 'g' })}${field('qaK', t('Kalorien'), inputNum(n.kcal), { unit: 'kcal' })}</div><p class="hint" id="qaHint"></p>`;
+/** Wires the protein/carbs/fat/kcal fields of macroGridHtml: kcal follows the macros (4/4/9) until the user types their own
+    value; clearing the kcal field makes it automatic again. vals() returns the numbers (kcal falls back to the macro sum). */
+function bindMacroKcal(sh, n = {}, hasEntry = false) {
+  const v = id => num($('#' + id, sh).value, 0, id === 'qaK' ? 20000 : 2000), calc = () => macroKcal(v('qaP'), v('qaC'), v('qaF'));
+  let override = hasEntry && Math.abs((n.kcal || 0) - calc()) > 1;
+  const hint = () => { const k = calc(), own = v('qaK');
+    $('#qaHint', sh).textContent = !override ? (k ? t('Kalorien aus den Makros berechnet (4/4/9)') : '') : (k && Math.abs(own - k) > 1 ? t('Eigener Wert · Makros ergeben ≈ {k} kcal · Feld leeren für automatisch', { k: de(k) }) : ''); };
+  const follow = () => { if (!override) { const k = calc(); $('#qaK', sh).value = k ? String(k) : ''; } hint(); };
+  $$('#qaP,#qaC,#qaF', sh).forEach(i => i.oninput = follow);
+  $('#qaK', sh).oninput = () => { override = $('#qaK', sh).value.trim() !== ''; if (!override) { follow(); return; } hint(); };
+  hint();
+  return { vals: () => { const p = v('qaP'), c = v('qaC'), f = v('qaF'); return { p, c, f, kcal: v('qaK') || macroKcal(p, c, f) }; } };
+}
+/** A quick entry is "what I ate", not per 100 g: save it as a custom food whose single Portion is exactly those numbers. */
+function quickToCustomFood(name, kcal, p, c, f) {
+  const G = Math.max(100, Math.ceil(Math.max(kcal / 9, p + c + f) / 10) * 10), k = 100 / G, id = 'cust:' + uid();   // portion weight keeps per-100 g values plausible
+  const food = { id, src: 'custom', code: '', name, brand: '', cat: 'Eigene', n: { kcal: r1(kcal * k), p: r1(p * k), c: r1(c * k), f: r1(f * k), sug: 0, fib: 0, salt: 0 }, serving: { g: G, label: 'Portion' } };
+  S.foods[id] = food; return { food, g: G };
+}
 function quickAddSheet(meal, entry = null) {
   meal = entry?.meal || meal || ui.targetMeal || mealDefault();
   const n = entry?.food.n || {}, date = ui.date;
-  openSheet(`${sheetHead(t(entry ? 'Schnelleintrag bearbeiten' : 'Schnelleintrag'), t('Nur Kalorien oder Makros – z. B. im Restaurant.'))}
+  openSheet(`${sheetHead(t(entry ? 'Schnelleintrag bearbeiten' : 'Schnelleintrag'), t('Protein, Kohlenhydrate und Fett eintippen – die Kalorien rechnen sich selbst aus.'))}
     <div class="form">${field('qaN', t('Bezeichnung'), entry?.food.name || '', { ph: t('Schnelleintrag'), mode: 'text' })}
-    <div class="grid2">${field('qaK', t('Kalorien'), inputNum(n.kcal), { unit: 'kcal' })}${field('qaP', t('Protein'), inputNum(n.p), { unit: 'g' })}${field('qaC', t('Kohlenhydrate'), inputNum(n.c), { unit: 'g' })}${field('qaF', t('Fett'), inputNum(n.f), { unit: 'g' })}</div>
-    <p class="hint" id="qaHint"></p>${mealSeg(meal, 'qaM')}
+    ${macroGridHtml(n)}${mealSeg(meal, 'qaM')}
+    <div class="card list"><label class="row-item"><span class="grow"><span class="nm">${t('Als eigenes Lebensmittel speichern')}</span><span class="sub">${t('Zum schnellen Wiederverwenden unter „Eigene“')}</span></span><input type="checkbox" class="switch" id="qaCust"></label></div>
     <button class="btn block" id="qaSave">${t(entry ? 'Speichern' : 'Hinzufügen')}</button>${entry ? `<button class="btn plain danger-text block" id="qaDel">${t('Eintrag löschen')}</button>` : ''}</div>`, sh => {
-    const v = id => num($('#' + id).value, 0, id === 'qaK' ? 20000 : 2000);
-    const hint = () => { const k = v('qaP') * 4 + v('qaC') * 4 + v('qaF') * 9; $('#qaHint').textContent = k && !v('qaK') ? t('≈ {k} kcal aus Makros', { k: de(k) }) : ''; };
-    $$('#qaK,#qaP,#qaC,#qaF', sh).forEach(i => i.oninput = hint);
+    const mk = bindMacroKcal(sh, n, !!entry);
     bindSeg(sh, 'qaM', m => meal = m);
-    if (!entry) setTimeout(() => $('#qaK')?.focus(), 250);
+    if (!entry) setTimeout(() => $('#qaP')?.focus(), 250);
     $('#qaSave').onclick = () => {
-      const p = v('qaP'), c = v('qaC'), f = v('qaF'), kcal = v('qaK') || Math.round(p * 4 + c * 4 + f * 9);
+      const { p, c, f, kcal } = mk.vals(), name = $('#qaN').value.trim();
       if (!kcal) return toast(t('Bitte Kalorien oder Makros eingeben'));
-      const food = { id: entry?.food.id || 'quick:' + uid(), name: $('#qaN').value.trim() || t('Schnelleintrag'), cat: '', src: 'quick', n: { kcal, p, c, f, fib: 0, sug: 0, salt: 0 } };
-      if (entry) { touch(entry, { food, meal }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
-      const e = addEntry(food, 100, 'Schnelleintrag', meal, date, { quick: true });
+      const asCustom = $('#qaCust').checked; if (asCustom && !name) return toast(t('Bitte Namen eingeben'));
+      const custom = asCustom ? quickToCustomFood(name, kcal, p, c, f) : null;
+      const food = { id: entry?.food.id || 'quick:' + uid(), name: name || t('Schnelleintrag'), cat: '', src: 'quick', n: { kcal, p, c, f, fib: 0, sug: 0, salt: 0 } };
+      if (entry) { touch(entry, { food, meal }); save(); closeSheet(); rerender(); return toast(t(asCustom ? 'Gespeichert · als eigenes Lebensmittel angelegt' : 'Gespeichert')); }
+      // saved as a custom food: log that food (one Portion), so it shows up in "Eigene" and recents; otherwise a plain quick entry
+      const e = custom ? addEntry(custom.food, custom.g, '1 × Portion', meal, date, { unit: 'serv', qty: 1 }) : addEntry(food, 100, 'Schnelleintrag', meal, date, { quick: true });
       closeSheet(); ui.targetMeal = null; go('diary');
-      undoable(t('{k} kcal hinzugefügt', { k: de(kcal) }), () => deleteSilently(date, e));
+      undoable(t(asCustom ? '{k} kcal hinzugefügt · als eigenes Lebensmittel gespeichert' : '{k} kcal hinzugefügt', { k: de(kcal) }), () => deleteSilently(date, e));
     };
     if (entry) $('#qaDel').onclick = () => deleteEntry(date, entry);
   });

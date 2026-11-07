@@ -14,6 +14,11 @@ function renderProfile(v) {
   <div class="sec"><h4>${t('Scanner')}</h4></div>
   <div class="card list">${switchRow('sBeep', t('Ton beim Scannen'), st.beep)}${switchRow('sCont', t('Serienscan'), st.continuousScan, t('Produkte direkt hinzufügen, Kamera bleibt offen'))}</div>
 
+  <div class="sec"><h4>${t('Lebensmitteldatenbank')}</h4></div>
+  <div class="card list"><label class="row-item"><span class="grow nm">USDA API-Key</span><span class="inline-in wide"><input id="sUsda" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${t('Key einfügen')}" value="${esc(USDA.getKey())}"></span></label>
+    ${navRow('sUsdaTest', 'check', t('Key testen'), t('Sucht kurz nach „apple“'))}</div>
+  <p class="hint pad">${t('Für Lebensmittel ohne Barcode (USDA FoodData Central, gemeinfrei). Kostenloser Key: fdc.nal.usda.gov/api-key-signup. Der Key bleibt nur auf diesem Gerät: kein Backup, keine Synchronisation.')}</p>
+
   <div class="sec"><h4>${t('Darstellung')}</h4></div>
   <div class="card list"><div class="row-item"><span class="grow nm">${t('Design')}</span>${seg('sTheme', [['light', t('Hell')], ['dark', t('Dunkel')], ['system', t('Auto')]], st.theme, 'sm')}</div>
     <div class="row-item"><span class="grow nm">${t('Sprache')}</span>${seg('sLang', [['de', 'Deutsch'], ['en', 'English']], LANG, 'sm')}</div></div>
@@ -29,6 +34,12 @@ function renderProfile(v) {
   <p class="foot">${t('Alles bleibt auf diesem Gerät – kein Konto, keine Cloud, keine Paywall.')}<br>${t('{p} Produkte offline · {b} Basis-Lebensmittel', { p: Object.keys(S.products).length, b: BASE_FOODS.length })} · <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a></p>`;
 
   $('#pGoals').onclick = goalsSheet; window.bindSyncCard?.();
+  $('#sUsda').onchange = e => { USDA.setKey(e.target.value); e.target.value = USDA.getKey(); toast(t(USDA.getKey() ? 'USDA-Key gespeichert' : 'USDA-Key entfernt')); };
+  $('#sUsdaTest').onclick = async () => {
+    USDA.setKey($('#sUsda').value); if (!USDA.getKey()) return toast(t('Bitte zuerst einen Key einfügen'));
+    try { const r = await USDA.search('apple'); toast(t('Key funktioniert – {n} Treffer', { n: r.length })); }
+    catch (e) { toast(t(USDA_MSG[e.kind] || USDA_MSG.http)); }
+  };
   const sv = () => { st.beep = $('#sBeep').checked; st.continuousScan = $('#sCont').checked; save(); };
   $$('#sBeep,#sCont', v).forEach(i => i.onchange = sv);
   bindSeg(v, 'sTheme', th => { st.theme = th; save(); applyTheme(); });

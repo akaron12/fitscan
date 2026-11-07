@@ -421,3 +421,4 @@ input[type=range] { width: 100%; accent-color: var(--acc); margin: 0; }
 .chk:active { background: var(--acc); color: #fff; }
 .wd i.plan { width: 6px; height: 6px; margin: -1px; box-sizing: border-box; border: 1.5px solid var(--acc); background: transparent; }
 .proj { margin-top: 8px; font-size: 13px; color: var(--acc); font-weight: 500; }
+.inline-in.wide input { width: 13rem; max-width: 52vw; }
