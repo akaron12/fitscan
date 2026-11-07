@@ -3,6 +3,8 @@
 const EN = {
   // Navigation & common
   'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Einstellungen': 'Settings',
+  'geplant': 'planned', 'Geplant': 'Planned', 'Alle bestätigen': 'Confirm all', 'Als gegessen bestätigen': 'Confirm as eaten', '{name} bestätigt': '{name} confirmed', '{n} bestätigt': '{n} confirmed', 'Als gegessen speichern': 'Save as eaten',
+  'Mit Geplantem: {r} kcal übrig': 'With planned: {r} kcal left', 'Mit Geplantem: {r} kcal drüber': 'With planned: {r} kcal over',
   'Mit Drive verbinden': 'Connect Drive', 'Synchronisiere…': 'Syncing…', '{n} nicht synchronisiert · zum Anmelden tippen': '{n} not synced · tap to sign in', 'Zum Anmelden tippen': 'Tap to sign in', '{n} warten · offline': '{n} waiting · offline', 'Offline': 'Offline',
   'Sync-Fehler · tippen': 'Sync error · tap', '{n} nicht synchronisiert': '{n} not synced', 'Synchronisiert': 'Synced', 'Synchronisation': 'Sync', 'Jetzt synchronisieren': 'Sync now', 'Mit Google Drive verbinden': 'Connect Google Drive',
   'Verbunden': 'Connected', 'Anmeldung abgelaufen': 'Sign-in expired', 'Nicht verbunden': 'Not connected', 'Zuletzt {t}': 'Last {t}', '{d}: nicht synchronisiert ({w})': '{d}: not synced ({w})', 'Anmeldung fehlgeschlagen: {m}': 'Sign-in failed: {m}',

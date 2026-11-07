@@ -411,3 +411,13 @@ input[type=range] { width: 100%; accent-color: var(--acc); margin: 0; }
 .sync-pill.busy { color: var(--mut); }
 .sync-pill:empty { display: none; }
 .hint.warn { color: var(--danger-ink); }
+
+/* ---- Planned meals ---- */
+.row-item.entry.planned > :not(.chk) { opacity: .62; }
+.plan-tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--acc-soft); color: var(--acc); letter-spacing: .01em; }
+.plan-k { color: var(--acc); font-weight: 600; }
+.chk { flex: none; width: 34px; height: 34px; margin-left: 10px; border-radius: 50%; border: 1.5px solid var(--acc); background: transparent; color: var(--acc); display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.chk .ic { width: 18px; height: 18px; stroke-width: 2.4; }
+.chk:active { background: var(--acc); color: #fff; }
+.wd i.plan { width: 6px; height: 6px; margin: -1px; box-sizing: border-box; border: 1.5px solid var(--acc); background: transparent; }
+.proj { margin-top: 8px; font-size: 13px; color: var(--acc); font-weight: 500; }

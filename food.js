@@ -128,7 +128,8 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
       <select class="input" id="fsUnit" aria-label="${t('Einheit')}">${units.map(u => `<option value="${u[0]}" ${u[0] === unit ? 'selected' : ''}>${esc(u[1])}${u[0] === 'serv' || u[0] === 'pc' ? ` (${de(u[2])} g)` : ''}</option>`).join('')}</select></div>
     <div class="chips presets">${presets.map((p, i) => `<button class="chip" data-pi="${i}">${esc(p[0])}</button>`).join('')}</div>
     ${mealSeg(meal, 'fsMeal')}
-    <button class="btn block" id="fsSave">${entry ? t('Speichern') : t('Zu {m} hinzufügen', { m: mealName(meal) })}</button>
+    ${entry && !isEaten(entry) ? `<button class="btn block" id="fsEat">${t('Als gegessen speichern')}</button>` : ''}
+    <button class="btn ${entry && !isEaten(entry) ? 'secondary ' : ''}block" id="fsSave">${entry ? t('Speichern') : t('Zu {m} hinzufügen', { m: mealName(meal) })}</button>
     ${entry ? `<button class="btn plain danger-text block" id="fsDel">${t('Eintrag löschen')}</button>` : ''}
     ${editable ? `<button class="btn plain block" id="fsEdit">${t(editable === 'recipe' ? 'Gericht bearbeiten' : 'Lebensmittel bearbeiten')}</button>` : ''}
     <div class="sec"><h4>${t('Nährwerte')}</h4><span class="cols"><span>100 g</span>${sv ? `<span>${t('Portion')}</span>` : ''}</span></div>
@@ -145,15 +146,16 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
     $$('[data-pi]', sh).forEach(b => b.onclick = () => { const p = presets[+b.dataset.pi]; if (units.some(u => u[0] === p[1])) ui2.value = p[1]; qi.value = inputNum(p[2]); live(); $$('[data-pi]', sh).forEach(x => x.classList.toggle('on', x === b)); });
     bindSeg(sh, 'fsMeal', m => { meal = m; if (!entry) $('#fsSave').textContent = t('Zu {m} hinzufügen', { m: mealName(m) }); });
     $('#fsFav').onclick = () => { if (S.favorites[food.id]) delete S.favorites[food.id]; else S.favorites[food.id] = { ...food }; save(); $('#fsFav').innerHTML = I('star', S.favorites[food.id] ? 'fill' : ''); toast(t(S.favorites[food.id] ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')); };
-    $('#fsSave').onclick = () => {
+    const doSave = status => {
       const g = grams(); if (!(g > 0)) return toast(t('Bitte Menge eingeben')); if (g > 2e4) return toast(t('Menge zu groß'));
       const u = units.find(x => x[0] === ui2.value), q = num(qi.value, 0, 1e4);
       const label = u[0] === 'g' ? `${de(q)} g` : u[0] === 'ml' ? `${de(q)} ml` : `${de(q, q % 1 ? 1 : 0)} × ${u[0] === 'serv' ? food.serving.label || 'Portion' : 'Stück'}`;
-      if (entry) { touch(entry, { g, label, meal, unit: u[0], qty: q }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
+      if (entry) { touch(entry, { g, label, meal, unit: u[0], qty: q, ...(status ? { status } : {}) }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
       const e = addEntry(food, g, label, meal, date, { unit: u[0], qty: q });
       closeSheet(); ui.targetMeal = null; go('diary', { date });
       undoable(t('{name} hinzugefügt', { name: food.name }), () => deleteSilently(date, e));
     };
+    $('#fsSave').onclick = () => doSave(); if ($('#fsEat')) $('#fsEat').onclick = () => doSave('eaten');
     if (entry) $('#fsDel').onclick = () => deleteEntry(date, entry);
     if (editable) $('#fsEdit').onclick = () => editable === 'recipe' ? recipeSheet(S.recipes[food.id]) : customFoodSheet(S.foods[food.id]);
   });

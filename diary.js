@@ -2,10 +2,11 @@
 /* FitScan – diary: day summary, meals, quick add, day details. */
 const dayLabel = d => d === today() ? t('Heute') : d === addDays(today(), -1) ? t('Gestern') : d === addDays(today(), 1) ? t('Morgen') : fmtDate(d);
 const MACROS = [['p', 'Protein'], ['c', 'Kohlenhydrate'], ['f', 'Fett']];
+const hasPlanned = d => (S.entries[d] || []).some(e => !isEaten(e));
 const entryLabel = e => e.quick ? t('Schnelleintrag') : tFood(e.label || r0(e.g) + ' g');
 
 function renderDiary(v) {
-  const d = ui.date, tt = dayTotals(d), g = S.goals, rest = g.kcal - tt.kcal, es = S.entries[d] || [], st = streak();
+  const d = ui.date, tt = dayTotals(d), pt = plannedTotals(d), g = S.goals, rest = g.kcal - tt.kcal, es = S.entries[d] || [], st = streak();
   $('#pageTitle').textContent = [today(), addDays(today(), -1), addDays(today(), 1)].includes(d) ? dayLabel(d) : t('Tagebuch');
   $('#pageSub').textContent = fmtLong(d);
   if (d !== today()) topAction(t('Heute'), () => { ui.date = today(); render(); });
@@ -13,7 +14,7 @@ function renderDiary(v) {
   const mon = addDays(d, -((new Date(d + 'T12:00:00').getDay() + 6) % 7));
   const week = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
   let html = `<nav class="week"><button class="wk-nav" id="wkPrev" aria-label="${t('Vorherige Woche')}">${I('chevL')}</button>
-    ${week.map(x => `<button class="wd${x === d ? ' on' : ''}${x === today() ? ' today' : ''}" data-day="${x}"><span class="wd-l">${new Date(x + 'T12:00:00').toLocaleDateString(LOC(), { weekday: 'narrow' })}</span><span class="wd-n">${+x.slice(8)}</span><i class="${isLogged(x) ? 'on' : ''}"></i></button>`).join('')}
+    ${week.map(x => `<button class="wd${x === d ? ' on' : ''}${x === today() ? ' today' : ''}" data-day="${x}"><span class="wd-l">${new Date(x + 'T12:00:00').toLocaleDateString(LOC(), { weekday: 'narrow' })}</span><span class="wd-n">${+x.slice(8)}</span><i class="${isLogged(x) ? 'on' : hasPlanned(x) ? 'plan' : ''}"></i></button>`).join('')}
     <button class="wk-nav" id="wkNext" aria-label="${t('Nächste Woche')}">${I('chevR')}</button></nav>`;
 
   if (!S.goals.manual) html += `<button class="card banner" id="setupBanner"><span class="banner-ic">${I('target')}</span><span class="grow"><b>${t('Ziele festlegen')}</b><span class="sub">${t('Kalorien- und Makroziele eintragen')}</span></span>${I('chevR', 'chev')}</button>`;
@@ -23,16 +24,17 @@ function renderDiary(v) {
   html += `<section class="card summary" id="sum" role="button" tabindex="0">
     <div class="sum-top"><div class="ring">${ring(tt.kcal, g.kcal, 140, 13)}<div class="center"><span class="big">${de(Math.abs(rest))}</span><span class="sub">${rest >= 0 ? t('kcal übrig') : t('kcal drüber')}</span></div></div>
     <div class="macros">${MACROS.map(([k, l]) => mrow(k, l)).join('')}</div></div>
-    <div class="sum-foot"><span>${t('{a} von {b} kcal', { a: de(tt.kcal), b: de(g.kcal) })}</span>${st ? `<span class="streak" title="${t('Tage in Folge geloggt')}">${I('flame')}${st}</span>` : ''}<span class="grow"></span><span class="link">${t('Details')}${I('chevR')}</span></div></section>`;
+    <div class="sum-foot"><span>${t('{a} von {b} kcal', { a: de(tt.kcal), b: de(g.kcal) })}</span>${st ? `<span class="streak" title="${t('Tage in Folge geloggt')}">${I('flame')}${st}</span>` : ''}<span class="grow"></span><span class="link">${t('Details')}${I('chevR')}</span></div>${projLine(tt, pt, g)}</section>`;
 
   if (!es.length && isLogged(addDays(d, -1))) html += `<button class="btn secondary block" id="copyDay">${I('undo')}${t('Ganzen Tag von gestern kopieren')}</button>`;
 
   for (const [id, name] of MEALS) {
-    const me = es.filter(e => e.meal === id), kc = me.filter(isEaten).reduce((a, e) => a + nutr(e.food, e.g).kcal, 0);
+    const me = es.filter(e => e.meal === id), eatenN = me.filter(isEaten).length, planned = me.filter(e => !isEaten(e));
+    const kc = me.filter(isEaten).reduce((a, e) => a + nutr(e.food, e.g).kcal, 0), pk = planned.reduce((a, e) => a + nutr(e.food, e.g).kcal, 0);
     const canCopy = !me.length && (S.entries[addDays(d, -1)] || []).some(e => e.meal === id);
-    html += `<section class="card meal"><header class="card-h"><h3>${t(name)}</h3><span class="card-v">${me.length ? de(kc) + ' kcal' : ''}</span></header>
+    html += `<section class="card meal"><header class="card-h"><h3>${t(name)}</h3><span class="card-v">${eatenN ? de(kc) + ' kcal' : ''}${pk ? `${eatenN ? ' ' : ''}<span class="plan-k">+${de(pk)} ${t('geplant')}</span>` : ''}</span></header>
       ${me.length ? `<div class="list">${me.map(entryRow).join('')}</div>` : ''}
-      <footer class="meal-f"><button class="link-btn" data-add="${id}">${I('plus')}${t('Hinzufügen')}</button>${canCopy ? `<button class="link-btn quiet" data-copy="${id}">${t('Wie gestern')}</button>` : ''}<span class="grow"></span>
+      <footer class="meal-f"><button class="link-btn" data-add="${id}">${I('plus')}${t('Hinzufügen')}</button>${planned.length ? `<button class="link-btn" data-confirm="${id}">${I('check')}${t('Alle bestätigen')}</button>` : ''}${canCopy ? `<button class="link-btn quiet" data-copy="${id}">${t('Wie gestern')}</button>` : ''}<span class="grow"></span>
       <button class="icon-plain" data-quick="${id}" aria-label="${t('Schnelleintrag')}" title="${t('Schnelleintrag')}">${I('zap')}</button><button class="icon-plain" data-mscan="${id}" aria-label="${t('Scannen')}" title="${t('Scannen')}">${I('scan')}</button></footer></section>`;
   }
 
@@ -49,11 +51,25 @@ function renderDiary(v) {
   $$('[data-copy]', v).forEach(b => b.onclick = () => copyEntries((S.entries[addDays(d, -1)] || []).filter(e => e.meal === b.dataset.copy), d));
   $$('[data-quick]', v).forEach(b => b.onclick = () => quickAddSheet(b.dataset.quick));
   $$('[data-mscan]', v).forEach(b => b.onclick = () => { ui.targetMeal = b.dataset.mscan; openScanner(); });
+  $$('[data-chk]', v).forEach(b => b.onclick = ev => { ev.stopPropagation(); const e = es.find(x => x.id === b.dataset.chk); if (e) confirmPlanned(d, [e]); });
+  $$('[data-confirm]', v).forEach(b => b.onclick = () => confirmPlanned(d, es.filter(e => e.meal === b.dataset.confirm && !isEaten(e))));
   $$('[data-eid]', v).forEach(el => el.onclick = () => { const e = es.find(x => x.id === el.dataset.eid); if (!e) return; e.quick ? quickAddSheet(e.meal, e) : foodSheet(e.food, { entry: e, date: d }); });
 }
 function entryRow(e) {
-  const n = nutr(e.food, e.g);
-  return `<div class="row-item entry" data-eid="${e.id}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${esc(entryLabel(e))} · P ${r0(n.p)} · ${t('K')} ${r0(n.c)} · F ${r0(n.f)}</div></div><div class="kcal">${de(n.kcal)}</div></div>`;
+  const n = nutr(e.food, e.g), planned = !isEaten(e), note = e.x?.note ? ` · ${esc(e.x.note)}` : '';
+  return `<div class="row-item entry${planned ? ' planned' : ''}" data-eid="${e.id}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${planned ? `<span class="plan-tag">${t('Geplant')}</span> ` : ''}${esc(entryLabel(e))} · P ${r0(n.p)} · ${t('K')} ${r0(n.c)} · F ${r0(n.f)}${note}</div></div><div class="kcal">${de(n.kcal)}</div>${planned ? `<button class="chk" data-chk="${e.id}" aria-label="${t('Als gegessen bestätigen')}" title="${t('Als gegessen bestätigen')}">${I('check')}</button>` : ''}</div>`;
+}
+/** Eaten totals drive the ring; planned meals only show as a projection. */
+function projLine(tt, pt, g) {
+  if (!(pt.kcal > 0)) return '';
+  const left = g.kcal - tt.kcal - pt.kcal;
+  return `<div class="proj">${t(left >= 0 ? 'Mit Geplantem: {r} kcal übrig' : 'Mit Geplantem: {r} kcal drüber', { r: de(Math.abs(left)) })} · P ${r0(tt.p + pt.p)} / ${g.p} g</div>`;
+}
+/** One tap: planned -> eaten at the planned amount. Undo puts it back to planned. */
+function confirmPlanned(date, list) {
+  const todo = list.filter(e => !isEaten(e)); if (!todo.length) return;
+  todo.forEach(e => touch(e, { status: 'eaten' })); save(); rerender();
+  undoable(todo.length === 1 ? t('{name} bestätigt', { name: todo[0].food.name }) : t('{n} bestätigt', { n: todo.length }), () => { todo.forEach(e => touch(e, { status: 'planned' })); save(); rerender(); });
 }
 function copyEntries(src, to) {
   if (!src?.length) return;

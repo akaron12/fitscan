@@ -58,6 +58,15 @@ test('first sync with existing local data and a different remote day: nothing is
   const b = device(d, { name: 'b' }); eat(b, TODAY, { food: 'Local' }); await b.eng.syncNow({ visibleDate: TODAY });
   eq(entriesOf(b, TODAY).map(e => e.food.name).sort(), ['Local', 'Remote'], 'both on the device'); eq(remoteEntries(d, TODAY).map(e => e.food).sort(), ['Local', 'Remote'], 'both on Drive');
 });
+test('Claude plans ahead: the next 7 days are pulled automatically, later days only when opened', async () => {
+  const d = setup(), a = device(d); await a.eng.syncNow();
+  claudeWrites(d, '2026-11-08', DayFile.serialize(DayFile.create('2026-11-08', [fe({ food: 'Tomorrow' })])));
+  claudeWrites(d, '2026-11-14', DayFile.serialize(DayFile.create('2026-11-14', [fe({ food: 'In a week' })])));
+  claudeWrites(d, '2026-11-15', DayFile.serialize(DayFile.create('2026-11-15', [fe({ food: 'Too far' })])));
+  await a.eng.syncNow();
+  eq([entriesOf(a, '2026-11-08').length, entriesOf(a, '2026-11-14').length, entriesOf(a, '2026-11-15').length], [1, 1, 0], 'window is today + 7 days');
+  await a.eng.syncNow({ visibleDate: '2026-11-15' }); eq(entriesOf(a, '2026-11-15').length, 1, 'opening a later day fetches it');
+});
 test('EATEN PROTECTION end to end: Claude re-plans an entry you already ate', async () => {
   const d = setup(), a = device(d), e = eat(a, TODAY, { food: 'Lunch bowl', qty_g: 300, kcal: 450 }); await a.eng.syncNow();
   const m = remoteModel(d, TODAY); const re = DayFile.parse.entries(m)[0]; re.status = 'planned'; re.qty_g = 500; re.kcal = 750; claudeWrites(d, TODAY, DayFile.serialize(m));

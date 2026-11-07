@@ -8,7 +8,7 @@
 (function (root) {
   const SPEC_MARKER = '<!-- Managed by the Meal Tracker app.';
   const DAY_RE = /^(\d{4}-\d{2}-\d{2})\.md$/;
-  const MAX_SUGGESTIONS = 50, KEEP_DAYS = 120;
+  const MAX_SUGGESTIONS = 50, KEEP_DAYS = 120, AHEAD_DAYS = 7;
 
   // ---------- settings.md (goals) ----------
   const GOAL_KEYS = ['kcal', 'p', 'c', 'f'];
@@ -46,7 +46,11 @@
 
     // ---------- what is waiting to be pushed ----------
     const windowDates = (visible, wide) => {
-      const out = new Set(), n = wide ? 90 : windowDays; for (let i = 0; i < n; i++) out.add(addDaysISO(today(), -i)); if (visible) out.add(visible); return out;
+      // Claude plans ahead, so the window reaches AHEAD_DAYS into the future (i < 0 counts forward from today).
+      const out = new Set(), n = wide ? 90 : windowDays;
+      for (let i = -AHEAD_DAYS; i < n; i++) out.add(addDaysISO(today(), -i));
+      if (visible) out.add(visible);
+      return out;
     };
     function addDaysISO(s, n) { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
     const sigOf = (date) => {

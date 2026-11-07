@@ -29,8 +29,8 @@ const SyncApp = (() => {
   }
   async function wake(reason) { await quietRenew(); await sync(reason); }
   window.onLocalSave = () => { clearTimeout(timer); paint(); timer = setTimeout(() => sync('edit'), 2500); };
-  window.onRendered = () => {   // looking at an old day (outside the 14-day window): fetch it once
-    if (ui.tab === 'diary' && ui.date < addDays(today(), -13) && !oldDaysAsked.has(ui.date) && DriveAuth.getToken()) { oldDaysAsked.add(ui.date); sync('old-day'); }
+  window.onRendered = () => {   // looking at a day outside the sync window (14 days back, 7 ahead): fetch it once
+    if (ui.tab === 'diary' && (ui.date < addDays(today(), -13) || ui.date > addDays(today(), 7)) && !oldDaysAsked.has(ui.date) && DriveAuth.getToken()) { oldDaysAsked.add(ui.date); sync('old-day'); }
     paint();
   };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) wake('focus'); });
