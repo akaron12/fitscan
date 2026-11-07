@@ -7,11 +7,12 @@
 <title>Drive sign-in test</title>
 <style>
   body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:16px;max-width:40rem;margin-inline:auto;color:#1c1c1e;background:#fff}
-  @media(prefers-color-scheme:dark){body{background:#000;color:#f2f2f7}pre{background:#1c1c1e}}
   h1{font-size:1.3rem;margin:.2rem 0 1rem}
   button{font:inherit;padding:.7rem 1rem;margin:.25rem .25rem .25rem 0;border-radius:10px;border:1px solid #888;background:transparent;color:inherit}
   button.primary{background:#0a84ff;border-color:#0a84ff;color:#fff}
-  pre{background:#f2f2f7;padding:12px;border-radius:10px;white-space:pre-wrap;word-break:break-word;font-size:13px;min-height:8rem}
+  pre{background:#f2f2f7;color:#1c1c1e;padding:12px;border-radius:10px;white-space:pre-wrap;word-break:break-word;font-size:13px;min-height:8rem}
+  #status{font-weight:600;margin:.6rem 0;padding:.6rem .8rem;border-radius:10px;background:#fff3cd;color:#3a2f00}
+  @media(prefers-color-scheme:dark){body{background:#000;color:#f2f2f7}pre{background:#1c1c1e;color:#f2f2f7}}
   .row{margin:.5rem 0}
 </style>
 </head>
@@ -26,6 +27,7 @@
   <button id="write">3. Write test file</button>
   <button id="trash">4. Trash test file</button>
 </div>
+<div id="status">Status: loading…</div>
 <pre id="log"></pre>
 
 <script>
@@ -34,7 +36,11 @@ const SCOPE = 'https://www.googleapis.com/auth/drive';
 const HINT = 'adammkaron@gmail.com';
 const $ = s => document.querySelector(s);
 const logEl = $('#log');
-const log = (...a) => { logEl.textContent += a.map(x => typeof x === 'string' ? x : JSON.stringify(x, null, 1)).join(' ') + '\n'; };
+const log = (...a) => {
+  const line = a.map(x => typeof x === 'string' ? x : JSON.stringify(x, null, 1)).join(' ');
+  logEl.textContent += line + '\n';
+  if (!line.startsWith('UA:')) $('#status').textContent = 'Status: ' + line.split('\n')[0].slice(0, 160);
+};
 let token = null, expiresAt = 0, testFileId = null, mealFolderId = null, client = null;
 
 $('#env').textContent = `standalone=${!!navigator.standalone || matchMedia('(display-mode: standalone)').matches} · origin=${location.origin}`;
