@@ -52,3 +52,5 @@ const ICONS = {
   trash: '<path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13"/>',
 };
 function I(name, cls = '') { return `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ICONS.utensils}</svg>`; }
+// Fill in the static icon placeholders of index.html (this used to be an inline <script>; the CSP forbids those).
+document.querySelectorAll('[data-ic]').forEach(e => e.insertAdjacentHTML('afterbegin', I(e.dataset.ic)));

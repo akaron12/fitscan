@@ -1,14 +1,14 @@
 'use strict';
 /* FitScan – UI shell: navigation, sheets, toasts and shared components. */
-let ui = { tab: 'diary', date: today(), targetMeal: null, libTab: 'recent', query: '', chart: { metric: 'weight', range: 90, type: 'line', smooth: 'ema', meas: 'waist' } };
+let ui = { tab: 'diary', date: today(), targetMeal: null, libTab: 'recent', query: '', chart: { metric: 'kcal', range: 30, type: 'bar', smooth: 'ma7' } };
 
 // ---------- Toast ----------
-function toast(msg, action) {
+function toast(msg, action, ms) {
   const el = $('#toast');
   el.innerHTML = `<span>${esc(msg)}</span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
   if (action) el.querySelector('button').onclick = () => { el.classList.remove('show'); action.fn(); };
   el.classList.toggle('actionable', !!action); el.classList.add('show');
-  clearTimeout(el._h); el._h = setTimeout(() => el.classList.remove('show'), action ? 5000 : 2200);
+  clearTimeout(el._h); el._h = setTimeout(() => el.classList.remove('show'), ms || (action ? 5000 : 2200));
 }
 const undoable = (msg, fn) => toast(msg, { label: t('Rückgängig'), fn });
 
@@ -58,13 +58,14 @@ function applyTheme() {
 mqDark.addEventListener?.('change', () => { if (S.settings.theme === 'system') { applyTheme(); render(); } });
 
 // ---------- Navigation ----------
-const TITLES = { diary: 'Tagebuch', library: 'Lebensmittel', progress: 'Fortschritt', profile: 'Profil' };
+const TITLES = { diary: 'Tagebuch', library: 'Lebensmittel', progress: 'Fortschritt', profile: 'Einstellungen' };
 function go(tab, opts = {}) { if (tab !== 'library') endMulti(); ui.tab = tab; Object.assign(ui, opts); window.scrollTo(0, 0); render(); }
 function render() {
   $$('.tabbar [data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === ui.tab));
   $('#pageTitle').textContent = t(TITLES[ui.tab]); $('#pageSub').textContent = ''; $('#topActions').innerHTML = '';
   ({ diary: renderDiary, library: renderLibrary, progress: renderProgress, profile: renderProfile })[ui.tab]($('#view'));
   $('#pageSub').classList.toggle('hidden', !$('#pageSub').textContent);
+  try { window.onRendered?.(); } catch {}
 }
 function rerender() { const y = window.scrollY; render(); window.scrollTo(0, y); }
 function topAction(label, fn) { const b = Object.assign(document.createElement('button'), { className: 'top-btn', textContent: label }); b.onclick = fn; $('#topActions').appendChild(b); }
@@ -84,19 +85,25 @@ function ring(val, goal, size, stroke, color = 'var(--acc)') {
 }
 function foodIcon(f, big = false) {
   const cls = `thumb${big ? ' big' : ''}`, initial = esc(String(f.name || '?').trim().charAt(0).toUpperCase());
-  if (f.img) return `<img class="${cls} img" src="${esc(f.img)}" loading="lazy" alt="${initial}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'${cls}',textContent:this.alt}))">`;
+  if (f.img) return `<img class="${cls} img" src="${esc(f.img)}" loading="lazy" alt="${initial}">`;   // a broken image falls back to the initial: see the capture listener below (no inline handlers: CSP)
   const ic = f.src === 'recipe' ? 'utensils' : f.src === 'custom' ? 'pen' : f.src === 'quick' ? 'zap' : null;
   return `<div class="${cls}">${ic ? I(ic) : initial}</div>`;
 }
-const nsMini = g => g && NS_COL[g] ? `<span class="nsm" style="background:${NS_COL[g]}">${g.toUpperCase()}</span>` : '';
-const nutriBadge = g => g && NS_COL[g] ? `<span class="ns" style="background:${NS_COL[g]}">Nutri-Score ${g.toUpperCase()}</span>` : '';
+// Image load errors do not bubble, so listen in the capture phase. Replaces the broken <img> by a lettered tile.
+document.addEventListener('error', e => {
+  const im = e.target; if (!(im instanceof HTMLImageElement) || !im.classList.contains('img')) return;
+  im.replaceWith(Object.assign(document.createElement('div'), { className: im.className.replace(/\bimg\b/, '').trim(), textContent: im.alt }));
+}, true);
+const isNs = g => typeof g === 'string' && /^[a-e]$/.test(g);   // never trust a lookup key from outside data (e.g. "constructor")
+const nsMini = g => isNs(g) ? `<span class="nsm" style="background:${NS_COL[g]}">${g.toUpperCase()}</span>` : '';
+const nutriBadge = g => isNs(g) ? `<span class="ns" style="background:${NS_COL[g]}">Nutri-Score ${g.toUpperCase()}</span>` : '';
 const seg = (id, opts, val, cls = '') => `<div class="seg ${cls}" id="${id}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" class="${String(v) === String(val) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 function bindSeg(root, id, fn) { $$(`#${id} button`, root).forEach(b => b.onclick = () => { $$(`#${id} button`, root).forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); }); }
 const segVal = (root, id) => $(`#${id} .on`, root)?.dataset.v;
 const MEAL_SHORT = { breakfast: 'Frühstück', lunch: 'Mittag', dinner: 'Abend', snacks: 'Snacks' };
 const mealSeg = (meal, id = 'mealSeg') => seg(id, MEALS.map(([k]) => [k, t(MEAL_SHORT[k])]), meal);
 const field = (id, label, val = '', { unit = '', ph = '', mode = 'decimal' } = {}) => `<label class="field"><span>${label}</span><span class="field-in"><input id="${id}" type="text" inputmode="${mode}" autocomplete="off" value="${esc(val ?? '')}" placeholder="${esc(ph)}">${unit ? `<em>${unit}</em>` : ''}</span></label>`;
-const inputNum = x => x == null || x === '' ? '' : String(r1(x)).replace('.', LANG === 'de' ? ',' : '.');
+const inputNum = x => x == null || x === '' ? '' : String(r1(x));   // decimal point (typed commas are still accepted by num())
 const emptyState = (icon, text) => `<div class="empty">${I(icon)}<p>${text}</p></div>`;
 const navRow = (id, icon, title, sub = '', val = '') => `<button class="row-item nav" id="${id}">${icon ? `<span class="row-ic">${I(icon)}</span>` : ''}<span class="grow"><span class="nm">${title}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</span>${val ? `<span class="row-val">${val}</span>` : ''}${I('chevR', 'chev')}</button>`;
 const stat = (label, value, unit = '', note = '') => `<div class="stat"><span class="stat-l">${label}</span><span class="stat-v">${value}${unit ? `<small>${unit}</small>` : ''}</span>${note ? `<span class="stat-n">${note}</span>` : ''}</div>`;

@@ -26,13 +26,21 @@ const actionRow = (id, icon, title, sub) => `<button class="row-item action" id=
 function foodRow(f) {
   const sub = f.src === 'recipe' ? esc(f.brand) : [esc(f.brand || tFood(f.cat)), `${de(f.n.kcal)} kcal/100 g`, f.serving?.g ? esc(tFood(f.serving.label)) : ''].filter(Boolean).join(' · ');
   const tag = f.src === 'custom' ? `<span class="tag">${t('Eigenes')}</span>` : '';
-  return `<div class="row-item food" data-fid="${esc(f.id)}">${multi ? `<span class="ck${picked.has(f.id) ? ' on' : ''}">${I('check')}</span>` : ''}${foodIcon(f)}<div class="grow"><div class="nm">${esc(f.name)}${nsMini(f.ns)}${tag}</div><div class="sub">${sub}</div></div>${multi ? '' : `<button class="add-btn" data-qa="${esc(f.id)}" aria-label="${t('Schnell hinzufügen')}">${I('plus')}</button>`}</div>`;
+  return `<div class="row-item food" data-fid="${esc(f.id)}">${multi ? `<span class="ck${picked.has(f.id) ? ' on' : ''}">${I('check')}</span>` : ''}${foodIcon(f)}<div class="grow"><div class="nm">${esc(f.name)}${nsMini(f.ns)}${tag}</div><div class="sub">${sub}</div></div>${multi ? '' : `<span class="row-acts"><button class="star-btn${S.favorites[f.id] ? ' on' : ''}" data-star="${esc(f.id)}" aria-label="${t('Favorit')}" aria-pressed="${S.favorites[f.id] ? 'true' : 'false'}">${I('star', S.favorites[f.id] ? 'fill' : '')}</button><button class="add-btn" data-qa="${esc(f.id)}" aria-label="${t('Schnell hinzufügen')}">${I('plus')}</button></span>`}</div>`;
 }
 function bindList(root, list) {
   const find = id => list.find(x => x.id === id);
   $$('[data-fid]', root).forEach(r => r.onclick = e => {
     const f = find(r.dataset.fid); if (!f) return;
     if (f.src === 'off' && f.code) { S.products[f.code] ||= f; save(); }
+    else if (f.src === 'usda') { S.products[f.id] ||= f; save(); }   // keep it searchable offline
+    const star = e.target.closest('[data-star]');
+    if (star) {   // star a food straight from the list (no need to open it)
+      const on = !S.favorites[f.id]; if (on) setFavorite(f); else removeFavorite(f.id); save();
+      star.classList.toggle('on', on); star.setAttribute('aria-pressed', on ? 'true' : 'false'); star.innerHTML = I('star', on ? 'fill' : '');
+      toast(t(on ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')); if (!on && ui.libTab === 'fav' && !ui.query.trim()) fillLibList();
+      return;
+    }
     if (e.target.closest('[data-qa]')) return quickLog(f);
     if (!multi) return foodSheet(f);
     if (picked.has(f.id)) picked.delete(f.id); else picked.set(f.id, f);
@@ -49,7 +57,7 @@ function fillLibList() {
   if (ui.query.trim()) return doSearch(true);
   let list = [], top = '', empty = null, grouped = false;
   switch (ui.libTab) {
-    case 'recent': top = actionRow('aQuick', 'zap', t('Schnelleintrag'), t('Nur Kalorien oder Makros')); list = S.recents; empty = ['clock', t('Hier erscheinen zuletzt eingetragene Lebensmittel.')]; break;
+    case 'recent': top = actionRow('aQuick', 'zap', t('Schnelleintrag'), t('Nur Kalorien oder Makros')) + (S.recents.length ? '' : actionRow('aBasics', 'book', t('Eingebaute Lebensmittel durchsuchen'), t('Über 500 Lebensmittel. Mit dem Stern merkst du Favoriten.'))); list = S.recents; empty = ['clock', t('Hier erscheinen zuletzt eingetragene Lebensmittel.')]; break;
     case 'fav': list = Object.values(S.favorites); empty = ['star', t('Noch keine Favoriten. Tippe beim Lebensmittel auf den Stern.')]; break;
     case 'scans': list = dedupe(S.scanHistory.map(h => Object.values(S.foods).find(f => f.code === h.code) || S.products[h.code]).filter(Boolean)); empty = ['scan', t('Hier erscheinen deine gescannten Produkte – auch offline verfügbar.')]; break;
     case 'custom': top = actionRow('aCustom', 'plus', t('Eigenes Lebensmittel anlegen'), t('Mit Nährwerten von der Verpackung')); list = Object.values(S.foods); break;
@@ -61,6 +69,7 @@ function fillLibList() {
   else rows = list.map(foodRow).join('');
   el.innerHTML = (top ? `<div class="card list">${top}</div>` : '') + (list.length ? `<div class="card list">${rows}</div>` : empty ? emptyState(...empty) : '');
   if ($('#aQuick')) $('#aQuick').onclick = () => quickAddSheet(ui.targetMeal);
+  if ($('#aBasics')) $('#aBasics').onclick = () => { ui.libTab = 'base'; rerender(); };
   if ($('#aCustom')) $('#aCustom').onclick = () => customFoodSheet();
   if ($('#aRecipe')) $('#aRecipe').onclick = () => recipeSheet();
   bindList(el, list);
@@ -74,17 +83,30 @@ function doSearch(now) {
     $('#aCode').onclick = () => handleBarcode(q); if (now) handleBarcode(q); return;
   }
   const loc = localSearch(q).slice(0, 12);
+  const hasKey = !!USDA.getKey();   // generic foods (no barcode) come from USDA; packaged products from Open Food Facts
   el.innerHTML = `${loc.length ? `<div class="sec"><h4>${t('Bibliothek & Eigene')}</h4></div><div class="card list" id="locRes">${loc.map(foodRow).join('')}</div>` : ''}
+    ${hasKey ? `<div class="sec"><h4>USDA FoodData Central</h4></div><div id="usdaRes"><div class="spinner"></div></div>`
+      : `<button class="card banner" id="usdaOff"><span class="banner-ic">${I('database')}</span><span class="grow"><b>${t('USDA-Suche aktivieren')}</b><span class="sub">${t('Für Lebensmittel ohne Barcode, z. B. „Hähnchenbrust roh“: kostenlosen API-Key in den Einstellungen eintragen')}</span></span>${I('chevR', 'chev')}</button>`}
     <div class="sec"><h4>Open Food Facts</h4></div><div id="offRes"><div class="spinner"></div></div>`;
   if (loc.length) bindList($('#locRes'), loc);
-  searchTimer = setTimeout(async () => {
-    const ctl = searchCtl = new AbortController();
-    try {
-      const res = await searchOFF(q, ctl.signal), box = $('#offRes'); if (ui.query.trim() !== q || !box) return;
-      box.innerHTML = res.length ? `<div class="card list">${res.map(foodRow).join('')}</div>` : `<p class="hint">${t('Keine Produkte gefunden.')}</p>`;
-      bindList(box, res);
-    } catch (e) { if (e.name !== 'AbortError' && $('#offRes')) $('#offRes').innerHTML = `<p class="hint">${t('Online-Suche gerade nicht erreichbar. Lokale Treffer funktionieren trotzdem.')}</p>`; }
-  }, now ? 0 : 400);
+  if ($('#usdaOff')) $('#usdaOff').onclick = () => go('profile');
+  searchTimer = setTimeout(() => { const ctl = searchCtl = new AbortController(); showOFF(q, ctl); if (hasKey) showUSDA(q, ctl); }, now ? 0 : 400);
+}
+async function showOFF(q, ctl) {
+  try {
+    const res = await searchOFF(q, ctl.signal), box = $('#offRes'); if (ui.query.trim() !== q || !box) return;
+    box.innerHTML = res.length ? `<div class="card list">${res.map(foodRow).join('')}</div>` : `<p class="hint">${t('Keine Produkte gefunden.')}</p>`;
+    bindList(box, res);
+  } catch (e) { if (e.name !== 'AbortError' && $('#offRes')) $('#offRes').innerHTML = `<p class="hint">${t('Online-Suche gerade nicht erreichbar. Lokale Treffer funktionieren trotzdem.')}</p>`; }
+}
+const USDA_MSG = { key: 'USDA hat den API-Key abgelehnt. Bitte in den Einstellungen prüfen.', rate: 'USDA-Limit erreicht (ca. 1.000 Suchen pro Stunde). Später erneut versuchen.', nokey: 'Kein USDA-API-Key hinterlegt.',
+  network: 'USDA gerade nicht erreichbar. Lokale Treffer funktionieren trotzdem.', http: 'USDA-Suche gerade nicht möglich.' };
+async function showUSDA(q, ctl) {
+  try {
+    const res = rank(await USDA.search(q, ctl.signal), q), box = $('#usdaRes'); if (ui.query.trim() !== q || !box) return;
+    box.innerHTML = res.length ? `<div class="card list">${res.map(foodRow).join('')}</div>` : `<p class="hint">${t('Keine Treffer bei USDA.')}</p>`;
+    bindList(box, res);
+  } catch (e) { if (e.name === 'AbortError') return; const box = $('#usdaRes'); if (box) box.innerHTML = `<p class="hint">${t(USDA_MSG[e.kind] || USDA_MSG.http)}</p>`; }
 }
 
 // ---------- Multi-select ----------
@@ -98,7 +120,7 @@ function multiBar() {
     let k = 0; const n = picked.size, date = ui.date, added = [];
     for (const f of picked.values()) { const p = defaultPortion(f); added.push(addEntry(f, p.g, p.label, meal, date, { unit: p.unit, qty: p.qty })); k += nutr(f, p.g).kcal; }
     ui.targetMeal = null; go('diary');
-    undoable(t('{n} Lebensmittel · {k} kcal hinzugefügt', { n, k: de(k) }), () => { S.entries[date] = (S.entries[date] || []).filter(x => !added.includes(x)); save(); rerender(); });
+    undoable(t('{n} Lebensmittel · {k} kcal hinzugefügt', { n, k: de(k) }), () => { added.forEach(x => removeEntry(date, x)); save(); rerender(); });
   };
 }
 
@@ -128,12 +150,13 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
       <select class="input" id="fsUnit" aria-label="${t('Einheit')}">${units.map(u => `<option value="${u[0]}" ${u[0] === unit ? 'selected' : ''}>${esc(u[1])}${u[0] === 'serv' || u[0] === 'pc' ? ` (${de(u[2])} g)` : ''}</option>`).join('')}</select></div>
     <div class="chips presets">${presets.map((p, i) => `<button class="chip" data-pi="${i}">${esc(p[0])}</button>`).join('')}</div>
     ${mealSeg(meal, 'fsMeal')}
-    <button class="btn block" id="fsSave">${entry ? t('Speichern') : t('Zu {m} hinzufügen', { m: mealName(meal) })}</button>
+    ${entry && !isEaten(entry) ? `<button class="btn block" id="fsEat">${t('Als gegessen speichern')}</button>` : ''}
+    <button class="btn ${entry && !isEaten(entry) ? 'secondary ' : ''}block" id="fsSave">${entry ? t('Speichern') : t('Zu {m} hinzufügen', { m: mealName(meal) })}</button>
     ${entry ? `<button class="btn plain danger-text block" id="fsDel">${t('Eintrag löschen')}</button>` : ''}
     ${editable ? `<button class="btn plain block" id="fsEdit">${t(editable === 'recipe' ? 'Gericht bearbeiten' : 'Lebensmittel bearbeiten')}</button>` : ''}
     <div class="sec"><h4>${t('Nährwerte')}</h4><span class="cols"><span>100 g</span>${sv ? `<span>${t('Portion')}</span>` : ''}</span></div>
     <div class="card list ntable">${nrow(t('Energie'), 'kcal', 'kcal', 0)}${nrow(t('Protein'), 'p', 'g', 1)}${nrow(t('Kohlenhydrate'), 'c', 'g', 1)}${nrow(t('davon Zucker'), 'sug', 'g', 1, ' micro')}${nrow(t('Fett'), 'f', 'g', 1)}${nrow(t('Ballaststoffe'), 'fib', 'g', 1)}${nrow(t('Salz'), 'salt', 'g', 2)}${micros}</div>
-    ${food.src === 'off' ? `<p class="hint">${t('Daten: Open Food Facts (ODbL) – Angaben können unvollständig sein.')}</p>` : ''}`, sh => {
+    ${food.src === 'off' ? `<p class="hint">${t('Daten: Open Food Facts (ODbL) – Angaben können unvollständig sein.')}</p>` : ''}${food.src === 'usda' ? `<p class="hint">${t('Daten: USDA FoodData Central (gemeinfrei) – Durchschnittswerte pro 100 g.')}</p>` : ''}`, sh => {
     const qi = $('#fsQty'), ui2 = $('#fsUnit');
     const grams = () => num(qi.value, 0, 1e4) * units.find(x => x[0] === ui2.value)[2];
     const live = () => { const n = nutr(food, grams());
@@ -144,16 +167,17 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
     live();
     $$('[data-pi]', sh).forEach(b => b.onclick = () => { const p = presets[+b.dataset.pi]; if (units.some(u => u[0] === p[1])) ui2.value = p[1]; qi.value = inputNum(p[2]); live(); $$('[data-pi]', sh).forEach(x => x.classList.toggle('on', x === b)); });
     bindSeg(sh, 'fsMeal', m => { meal = m; if (!entry) $('#fsSave').textContent = t('Zu {m} hinzufügen', { m: mealName(m) }); });
-    $('#fsFav').onclick = () => { if (S.favorites[food.id]) delete S.favorites[food.id]; else S.favorites[food.id] = { ...food }; save(); $('#fsFav').innerHTML = I('star', S.favorites[food.id] ? 'fill' : ''); toast(t(S.favorites[food.id] ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')); };
-    $('#fsSave').onclick = () => {
+    $('#fsFav').onclick = () => { if (S.favorites[food.id]) removeFavorite(food.id); else setFavorite(food); save(); $('#fsFav').innerHTML = I('star', S.favorites[food.id] ? 'fill' : ''); toast(t(S.favorites[food.id] ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')); };
+    const doSave = status => {
       const g = grams(); if (!(g > 0)) return toast(t('Bitte Menge eingeben')); if (g > 2e4) return toast(t('Menge zu groß'));
       const u = units.find(x => x[0] === ui2.value), q = num(qi.value, 0, 1e4);
       const label = u[0] === 'g' ? `${de(q)} g` : u[0] === 'ml' ? `${de(q)} ml` : `${de(q, q % 1 ? 1 : 0)} × ${u[0] === 'serv' ? food.serving.label || 'Portion' : 'Stück'}`;
-      if (entry) { Object.assign(entry, { g, label, meal, unit: u[0], qty: q }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
+      if (entry) { touch(entry, { g, label, meal, unit: u[0], qty: q, ...(status ? { status } : {}) }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
       const e = addEntry(food, g, label, meal, date, { unit: u[0], qty: q });
       closeSheet(); ui.targetMeal = null; go('diary', { date });
       undoable(t('{name} hinzugefügt', { name: food.name }), () => deleteSilently(date, e));
     };
+    $('#fsSave').onclick = () => doSave(); if ($('#fsEat')) $('#fsEat').onclick = () => doSave('eaten');
     if (entry) $('#fsDel').onclick = () => deleteEntry(date, entry);
     if (editable) $('#fsEdit').onclick = () => editable === 'recipe' ? recipeSheet(S.recipes[food.id]) : customFoodSheet(S.foods[food.id]);
   });
@@ -174,12 +198,12 @@ function customFoodSheet(f = null, code = '') {
       const v = id => num($('#' + id).value, 0, id === 'cfK' ? 900 : id === 'cfServ' ? 5000 : 100);
       const id = f?.id || 'cust:' + (code || uid());
       const food = { id, src: 'custom', code: code || f?.code || '', name, brand: $('#cfBrand').value.trim(), cat: 'Eigene', n: { kcal: v('cfK'), p: v('cfP'), c: v('cfC'), f: v('cfF'), sug: v('cfS'), fib: v('cfB'), salt: v('cfSa') }, serving: v('cfServ') ? { g: v('cfServ'), label: 'Portion' } : null };
-      S.foods[id] = food; if (S.favorites[id]) S.favorites[id] = { ...food };
+      saveCustomFood(food);
       save(); toast(t('Gespeichert')); if (ui.tab === 'library') rerender(); foodSheet(food);
     };
     if (f) $('#cfDel').onclick = async () => {
       if (!await confirmSheet({ title: t('„{n}“ löschen?', { n: esc(f.name) }), text: t('Bereits eingetragene Mahlzeiten bleiben erhalten.'), ok: t('Löschen'), danger: true })) return;
-      delete S.foods[f.id]; delete S.favorites[f.id]; save(); rerender(); toast(t('Gelöscht'));
+      deleteCustomFood(f.id); save(); rerender(); toast(t('Gelöscht'));
     };
   });
 }
@@ -213,7 +237,7 @@ function recipeSheet(r = null) {
       };
       if (r) $('#rDel').onclick = async () => {
         if (!await confirmSheet({ title: t('„{n}“ löschen?', { n: esc(rec.name) }), text: t('Bereits eingetragene Mahlzeiten bleiben erhalten.'), ok: t('Löschen'), danger: true })) return;
-        delete S.recipes[rec.id]; delete S.favorites[rec.id]; save(); rerender(); toast(t('Gelöscht'));
+        delete S.recipes[rec.id]; removeFavorite(rec.id); save(); rerender(); toast(t('Gelöscht'));
       };
     }, { keepScroll });
   };
@@ -269,7 +293,11 @@ async function serialAdd(code) {
     addEntry(p, pt.g, pt.label, meal, ui.date, { unit: pt.unit, qty: pt.qty });
     $('#scanTray').insertAdjacentHTML('afterbegin', `<div class="tray-item">${I('check')}<span class="grow">${esc(p.name)}</span><b>${de(nutr(p, pt.g).kcal)} kcal</b></div>`);
     scanStatus(t('Hinzugefügt – nächsten Barcode scannen'));
-  } catch { scanStatus(t('Keine Verbindung')); }
+  } catch {   // no connection: note the barcode as a placeholder row and keep scanning
+    addPending(code, ui.targetMeal || mealDefault(), ui.date);
+    $('#scanTray').insertAdjacentHTML('afterbegin', `<div class="tray-item">${I('clock')}<span class="grow">Barcode ${esc(code)}</span><b>⏳</b></div>`);
+    scanStatus(t('Offline – wird später nachgeschlagen'));
+  }
 }
 $('#scanClose').onclick = closeScanner;
 $('#scanMode').onclick = () => { S.settings.continuousScan = !S.settings.continuousScan; save(); scanModeUI(); };
@@ -305,7 +333,52 @@ async function handleBarcode(code) {
     else if (cached && product.src === 'off' && !navigator.onLine) toast(t('Aus lokalem Speicher (offline verfügbar)'));
     foodSheet(product);
   } catch (e) {
-    openSheet(`${sheetHead(t('Keine Verbindung'))}<p class="lead">${t('Open Food Facts ist gerade nicht erreichbar. Versuche es gleich nochmal oder lege das Produkt selbst an.')}</p>
-      <div class="stack"><button class="btn block" id="nfRetry">${t('Erneut versuchen')}</button><button class="btn block secondary" id="nfAdd">${t('Selbst anlegen')}</button></div>`, () => { $('#nfRetry').onclick = () => handleBarcode(code); $('#nfAdd').onclick = () => customFoodSheet(null, code); });
+    const off = navigator.onLine === false;   // offline: noting the barcode for later is the main action
+    openSheet(`${sheetHead(t('Keine Verbindung'))}<p class="lead">${t('Open Food Facts ist gerade nicht erreichbar. Versuche es gleich nochmal, merke den Barcode für später vor oder lege das Produkt selbst an.')}</p>
+      <div class="stack"><button class="btn block${off ? '' : ' secondary'}" id="nfLater">${t('Später nachschlagen')}</button><button class="btn block${off ? ' secondary' : ''}" id="nfRetry">${t('Erneut versuchen')}</button><button class="btn block secondary" id="nfAdd">${t('Selbst anlegen')}</button></div>`,
+      () => { $('#nfLater').onclick = () => pendingSheet(code); $('#nfRetry').onclick = () => handleBarcode(code); $('#nfAdd').onclick = () => customFoodSheet(null, code); });
   }
 }
+
+// ---------- Offline barcodes: a placeholder row now, looked up automatically when back online ----------
+const pendingFood = (code, n = {}) => ({ id: 'pending:' + code, src: 'pending', code, name: 'Barcode ' + code, brand: '', img: '', cat: '', serving: null,
+  n: { kcal: n.kcal || 0, p: n.p || 0, c: n.c || 0, f: n.f || 0, fib: 0, sug: 0, salt: 0 } });
+/** Values typed by the user are for the amount eaten; the placeholder amount is 100 g, so they are stored 1:1. */
+function addPending(code, meal, date, n = null) {
+  return addEntry(pendingFood(code, n || {}), 100, '100 g', meal, date, { pending: { manual: !!(n && n.kcal > 0) } });
+}
+function pendingSheet(code) {
+  let meal = ui.targetMeal || mealDefault(); const date = ui.date;
+  openSheet(`${sheetHead(t('Barcode {c} vormerken', { c: esc(code) }), t('Der Eintrag erscheint sofort im Tagebuch und wird nachgeschlagen, sobald du wieder online bist.'))}
+    <div class="form"><p class="hint">${t('Optional: Werte für die gegessene Menge schon jetzt eintragen. Eigene Werte haben später Vorrang, nur der Name wird ergänzt.')}</p>
+    ${macroGridHtml({})}${mealSeg(meal, 'pbM')}<button class="btn block" id="pbAdd">${t('Zum Tagebuch hinzufügen')}</button></div>`, sh => {
+    const mk = bindMacroKcal(sh, {}, false); bindSeg(sh, 'pbM', m => meal = m);
+    $('#pbAdd').onclick = () => {
+      const { p, c, f, kcal } = mk.vals(), e = addPending(code, meal, date, p || c || f || kcal ? { kcal, p, c, f } : null);
+      closeSheet(); ui.targetMeal = null; go('diary', { date });
+      undoable(t('Barcode {c} vorgemerkt', { c: code }), () => deleteSilently(date, e));
+    };
+  });
+}
+let resolving = false;
+/** Looks up every placeholder entry. Your own numbers win (only name/brand/image are filled in); otherwise the product's
+    nutrition replaces the zeros. Network errors leave the placeholder for the next attempt; "not found" is remembered. */
+async function resolvePending() {
+  if (resolving || navigator.onLine === false) return; resolving = true; let found = 0, missing = 0;
+  try {
+    for (const es of Object.values(S.entries)) for (const e of es) {
+      if (e.food?.src !== 'pending' || e.pending?.notFound) continue;
+      let res; try { res = await lookupBarcode(e.food.code); } catch { continue; }
+      if (!res.product) { e.pending = { ...(e.pending || {}), notFound: true }; missing++; continue; }
+      const p = res.product, manual = e.pending?.manual ?? (e.food.n.kcal > 0);
+      const snap = { id: p.id, name: p.name, brand: p.brand || '', img: p.img || '', cat: p.cat || '', n: manual ? e.food.n : p.n, serving: p.serving || null, src: p.src, code: p.code };
+      if (p.micro && !manual) snap.micro = p.micro; if (p.ns) snap.ns = p.ns; if (p.nova) snap.nova = p.nova;
+      touch(e, { food: snap }); delete e.pending; S.recents = [snap, ...S.recents.filter(x => x.id !== snap.id)].slice(0, 40); found++;
+    }
+  } finally { resolving = false; }
+  if (found || missing) { save(); if (!sheetOpen() && !$('#onb')) rerender(); }
+  if (found) toast(t('{n} Barcode(s) nachgeschlagen – bitte Menge prüfen', { n: found }));
+}
+addEventListener('online', () => resolvePending());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) resolvePending(); });
+setTimeout(resolvePending, 2000);

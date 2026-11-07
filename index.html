@@ -1,7 +1,11 @@
 <!doctype html>
-<html lang="de" data-theme="light">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
+<!-- Content-Security-Policy. GitHub Pages cannot send headers, so this is a meta tag (frame-ancestors is not available that way).
+     Why it matters: the app holds a Google Drive token and renders text from Open Food Facts, USDA and Drive files.
+     No inline or eval'd script; network and images only to the hosts below. tests/security.test.js keeps this list honest. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; style-src-elem 'self' https://accounts.google.com/gsi/style; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https://images.openfoodfacts.org; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/ https://world.openfoodfacts.org https://search.openfoodfacts.org https://api.nal.usda.gov; frame-src https://accounts.google.com/gsi/; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#ffffff">
 <meta name="description" content="FitScan – Free calorie &amp; macro tracker – unlimited barcode scans, no paywall. No account, your data stays on your device.">
@@ -17,16 +21,17 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="grow"><p id="pageSub" class="eyebrow hidden"></p><h1 id="pageTitle">Tagebuch</h1></div>
+    <div class="grow"><p id="pageSub" class="eyebrow hidden"></p><h1 id="pageTitle">Diary</h1></div>
     <div id="topActions"></div>
+    <button id="syncPill" class="sync-pill" type="button" aria-live="polite"></button>
   </header>
   <main id="view"></main>
   <nav class="tabbar">
-    <button data-tab="diary" class="active"><span data-ic="book"></span><span data-t="Tagebuch">Tagebuch</span></button>
-    <button data-tab="library"><span data-ic="search"></span><span data-t="Lebensmittel">Lebensmittel</span></button>
-    <button data-tab="scan" class="scan-tab" data-tl="Scannen" aria-label="Scannen"><span class="scan-btn" data-ic="scan"></span></button>
-    <button data-tab="progress"><span data-ic="chart"></span><span data-t="Fortschritt">Fortschritt</span></button>
-    <button data-tab="profile"><span data-ic="user"></span><span data-t="Profil">Profil</span></button>
+    <button data-tab="diary" class="active"><span data-ic="book"></span><span data-t="Tagebuch">Diary</span></button>
+    <button data-tab="library"><span data-ic="search"></span><span data-t="Lebensmittel">Foods</span></button>
+    <button data-tab="scan" class="scan-tab" data-tl="Scannen" aria-label="Scan"><span class="scan-btn" data-ic="scan"></span></button>
+    <button data-tab="progress"><span data-ic="chart"></span><span data-t="Fortschritt">Progress</span></button>
+    <button data-tab="profile"><span data-ic="settings"></span><span data-t="Einstellungen">Settings</span></button>
   </nav>
 </div>
 <div id="sheetBackdrop" class="backdrop hidden"></div>
@@ -39,8 +44,8 @@
   <div class="scan-bottom">
     <button class="glass-pill" id="scanMode"><span data-ic="repeat"></span><span id="scanModeL"></span></button>
     <div class="scan-actions">
-      <button class="glass-pill" id="scanManual"><span data-ic="keyboard"></span><span data-t="Nummer eingeben">Nummer eingeben</span></button>
-      <label class="glass-pill"><span data-ic="image"></span><span data-t="Foto">Foto</span><input type="file" accept="image/*" id="scanFile" hidden></label>
+      <button class="glass-pill" id="scanManual"><span data-ic="keyboard"></span><span data-t="Nummer eingeben">Enter number</span></button>
+      <label class="glass-pill"><span data-ic="image"></span><span data-t="Foto">Photo</span><input type="file" accept="image/*" id="scanFile" hidden></label>
     </div>
   </div>
 </div>
@@ -50,12 +55,18 @@
 <script src="i18n.js"></script>
 <script src="foods.js"></script>
 <script src="icons.js"></script>
-<script>document.querySelectorAll('[data-ic]').forEach(e => e.insertAdjacentHTML('afterbegin', I(e.dataset.ic)));</script>
 <script src="core.js"></script>
 <script src="ui.js"></script>
+<script src="usda.js"></script>
 <script src="diary.js"></script>
 <script src="food.js"></script>
 <script src="progress.js"></script>
 <script src="settings.js"></script>
+<script src="dayfile.js"></script>
+<script src="merge.js"></script>
+<script src="driveclient.js"></script>
+<script src="driveauth.js"></script>
+<script src="sync.js"></script>
+<script src="syncapp.js"></script>
 </body>
 </html>

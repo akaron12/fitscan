@@ -2,7 +2,35 @@
 /* FitScan i18n: German source strings are the keys; t() looks up English and fills {placeholders}. */
 const EN = {
   // Navigation & common
-  'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Scannen': 'Scan', 'Heute': 'Today', 'Gestern': 'Yesterday', 'Morgen': 'Tomorrow',
+  'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Einstellungen': 'Settings',
+  'Eingebaute Lebensmittel durchsuchen': 'Browse built-in foods', 'Über 500 Lebensmittel. Mit dem Stern merkst du Favoriten.': 'Over 500 foods. Tap the star to save favorites.',
+  'Update verfügbar': 'Update available', 'Neu laden': 'Reload', 'Produktdaten © Open-Food-Facts-Mitwirkende, Lizenz': 'Product data © Open Food Facts contributors, licence', 'Allgemeine Lebensmittel: USDA FoodData Central (gemeinfrei).': 'Generic foods: USDA FoodData Central (public domain).',
+  'Daten: USDA FoodData Central (gemeinfrei) – Durchschnittswerte pro 100 g.': 'Data: USDA FoodData Central (public domain) – average values per 100 g.',
+  'Nicht gefunden': 'Not found', 'Wartet auf Netz': 'Waiting for network', 'USDA-Suche aktivieren': 'Turn on USDA search', 'Keine Treffer bei USDA.': 'No USDA results.',
+  'Für Lebensmittel ohne Barcode, z. B. „Hähnchenbrust roh“: kostenlosen API-Key in den Einstellungen eintragen': 'For foods without a barcode, e.g. “chicken breast raw”: add a free API key in Settings',
+  'USDA hat den API-Key abgelehnt. Bitte in den Einstellungen prüfen.': 'USDA rejected the API key. Please check it in Settings.', 'USDA-Limit erreicht (ca. 1.000 Suchen pro Stunde). Später erneut versuchen.': 'USDA limit reached (about 1,000 searches per hour). Try again later.',
+  'Kein USDA-API-Key hinterlegt.': 'No USDA API key set.', 'USDA gerade nicht erreichbar. Lokale Treffer funktionieren trotzdem.': 'USDA is not reachable right now. Local results still work.', 'USDA-Suche gerade nicht möglich.': 'USDA search is not possible right now.',
+  'Später nachschlagen': 'Look up later', 'Open Food Facts ist gerade nicht erreichbar. Versuche es gleich nochmal, merke den Barcode für später vor oder lege das Produkt selbst an.': 'Open Food Facts is not reachable right now. Try again, note the barcode to look up later, or create the product yourself.',
+  'Barcode {c} vormerken': 'Note barcode {c} for later', 'Der Eintrag erscheint sofort im Tagebuch und wird nachgeschlagen, sobald du wieder online bist.': 'The entry appears in your diary right away and is looked up as soon as you are back online.',
+  'Optional: Werte für die gegessene Menge schon jetzt eintragen. Eigene Werte haben später Vorrang, nur der Name wird ergänzt.': 'Optional: enter the values for the amount you ate now. Your own values take priority later; only the name is filled in.',
+  'Zum Tagebuch hinzufügen': 'Add to diary', 'Barcode {c} vorgemerkt': 'Barcode {c} noted', '{n} Barcode(s) nachgeschlagen – bitte Menge prüfen': '{n} barcode(s) looked up – please check the amount', 'Offline – wird später nachgeschlagen': 'Offline – will be looked up later',
+  'Lebensmitteldatenbank': 'Food database', 'Key einfügen': 'Paste key', 'Key testen': 'Test key', 'Sucht kurz nach „apple“': 'Runs a quick search for “apple”', 'USDA-Key gespeichert': 'USDA key saved', 'USDA-Key entfernt': 'USDA key removed',
+  'Bitte zuerst einen Key einfügen': 'Please paste a key first', 'Key funktioniert – {n} Treffer': 'Key works – {n} results',
+  'Für Lebensmittel ohne Barcode (USDA FoodData Central, gemeinfrei). Kostenloser Key: fdc.nal.usda.gov/api-key-signup. Der Key bleibt nur auf diesem Gerät: kein Backup, keine Synchronisation.': 'For foods without a barcode (USDA FoodData Central, public domain). Free key: fdc.nal.usda.gov/api-key-signup. The key stays on this device only: not in backups, not synced.',
+  'Protein, Kohlenhydrate und Fett eintippen – die Kalorien rechnen sich selbst aus.': 'Type protein, carbs and fat – calories fill in automatically.', 'Kalorien aus den Makros berechnet (4/4/9)': 'Calories calculated from the macros (4/4/9)',
+  'Eigener Wert · Makros ergeben ≈ {k} kcal · Feld leeren für automatisch': 'Your own value · macros add up to ≈ {k} kcal · clear the field for automatic', 'Als eigenes Lebensmittel speichern': 'Save as custom food',
+  'Zum schnellen Wiederverwenden unter „Eigene“': 'Reuse it quickly under “Custom”', 'Gespeichert · als eigenes Lebensmittel angelegt': 'Saved · added as custom food', '{k} kcal hinzugefügt · als eigenes Lebensmittel gespeichert': '{k} kcal added · saved as custom food',
+  'geplant': 'planned', 'Geplant': 'Planned', 'Alle bestätigen': 'Confirm all', 'Als gegessen bestätigen': 'Confirm as eaten', '{name} bestätigt': '{name} confirmed', '{n} bestätigt': '{n} confirmed', 'Als gegessen speichern': 'Save as eaten',
+  'Mit Geplantem: {r} kcal übrig': 'With planned: {r} kcal left', 'Mit Geplantem: {r} kcal drüber': 'With planned: {r} kcal over',
+  'Mit Drive verbinden': 'Connect Drive', 'Synchronisiere…': 'Syncing…', '{n} nicht synchronisiert · zum Anmelden tippen': '{n} not synced · tap to sign in', 'Zum Anmelden tippen': 'Tap to sign in', '{n} warten · offline': '{n} waiting · offline', 'Offline': 'Offline',
+  'Sync-Fehler · tippen': 'Sync error · tap', '{n} nicht synchronisiert': '{n} not synced', 'Synchronisiert': 'Synced', 'Synchronisation': 'Sync', 'Jetzt synchronisieren': 'Sync now', 'Mit Google Drive verbinden': 'Connect Google Drive',
+  'Verbunden': 'Connected', 'Anmeldung abgelaufen': 'Sign-in expired', 'Nicht verbunden': 'Not connected', 'Zuletzt {t}': 'Last {t}', '{d}: nicht synchronisiert ({w})': '{d}: not synced ({w})', 'Anmeldung fehlgeschlagen: {m}': 'Sign-in failed: {m}',
+  'Vorschläge von außerhalb': 'Suggested changes', 'Änderungen aus Drive, die deine Einträge nicht überschreiben durften': 'Changes from Drive that were not allowed to overwrite your entries', 'Abmelden': 'Sign out',
+  'Der Zugriff bleibt in deinem Google-Konto, bis du ihn dort entfernst': 'Access stays in your Google account until you remove it there', 'Abgemeldet': 'Signed out', 'Verwerfen': 'Dismiss',
+  'Diese Änderungen kamen aus Drive und haben deine Einträge nicht überschrieben.': 'These changes came from Drive and did not overwrite your entries.', 'Keine Vorschläge.': 'No suggestions.',
+  'Planned change to an entry you already ate': 'Planned change to an entry you already ate', 
+ 'Kalorien- und Makroziele eintragen': 'Enter your calorie and macro goals', 'Kalorien und Makros pro Tag.': 'Calories and macros per day.',
+  'Tagebuch, eigene Lebensmittel und Einstellungen werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden.': 'Your diary, custom foods and settings will be removed from this device. This cannot be undone.', 'Scannen': 'Scan', 'Heute': 'Today', 'Gestern': 'Yesterday', 'Morgen': 'Tomorrow',
   'Abbrechen': 'Cancel', 'Schließen': 'Close', 'Speichern': 'Save', 'Löschen': 'Delete', 'Hinzufügen': 'Add', 'Weiter': 'Next', 'Zurück': 'Back', 'Fertig': 'Done', 'Auswählen': 'Select',
   'Rückgängig': 'Undo', 'Gespeichert': 'Saved', 'Gelöscht': 'Deleted', 'Details': 'Details', 'Datum': 'Date', 'Name': 'Name', 'Entfernen': 'Remove', 'Laden': 'Load', 'Importieren': 'Import',
   'Vorherige Woche': 'Previous week', 'Nächste Woche': 'Next week', 'Mahlzeit': 'Meal', 'Menge': 'Amount', 'Einheit': 'Unit', 'Fällig': 'Due', 'Auto': 'Auto',
@@ -121,8 +149,10 @@ const EN = {
   'Fleisch': 'Meat', 'Wurst': 'Cold cuts', 'Fisch': 'Fish', 'Hülsenfrüchte': 'Legumes', 'Nüsse': 'Nuts & seeds', 'Süßes': 'Sweets', 'Supplemente': 'Supplements', 'Getränke': 'Drinks',
   'Saucen': 'Sauces', 'Trockenobst': 'Dried fruit',
 };
-let LANG = 'de';
-const LOC = () => LANG === 'en' ? 'en-US' : 'de-DE';
+// English is the only language. The German strings used as keys throughout the code are internal lookup keys for the table above;
+// t() returns the English text, and dates/numbers use English formats.
+let LANG = 'en';
+const LOC = () => 'en-US';
 const I18N_MISSING = new Set();
 function t(s, vars) {
   let r = s;
@@ -144,7 +174,7 @@ function tFood(s) {
     .replace(/\bca\. /g, 'approx. ');
 }
 function applyLang(lang) {
-  LANG = lang === 'en' ? 'en' : 'de'; document.documentElement.lang = LANG;
+  LANG = 'en'; document.documentElement.lang = LANG;
   document.querySelectorAll('[data-t]').forEach(el => el.textContent = t(el.dataset.t));
   document.querySelectorAll('[data-tl]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.tl)); el.title = t(el.dataset.tl); });
 }
