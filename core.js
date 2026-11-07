@@ -25,10 +25,11 @@ const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 const mealName = id => t(MEALS.find(m => m[0] === id)?.[1] || 'Snacks');
 
 // ---------- State ----------
-const DEFAULT = () => ({ goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false }, entries: {},
+const DEFAULT = () => ({ goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false }, entries: {}, tombstones: {},
   foods: {}, products: {}, recipes: {}, recents: [], favorites: {}, scanHistory: [],
   settings: { theme: 'light', lang: null } });
 // Data removed from the app (weight, water, fasting, profile, check-ins) is dropped on load.
+const STATUSES = ['planned', 'eaten'], TOMBSTONE_TTL_DAYS = 60;
 const REMOVED_KEYS = ['profile', 'weights', 'water', 'measures', 'checkins', 'fast', 'fastLog'];
 function sanitize(o) {
   const d = DEFAULT(); if (!isObj(o)) o = {};
@@ -37,7 +38,25 @@ function sanitize(o) {
   for (const k of ['goals', 'entries', 'foods', 'products', 'recipes', 'favorites', 'settings']) if (!isObj(s[k])) s[k] = DEFAULT()[k];
   for (const k of ['recents', 'scanHistory']) if (!Array.isArray(s[k])) s[k] = [];
   for (const k of ['kcal', 'p', 'c', 'f']) s.goals[k] = Number.isFinite(+s.goals[k]) ? +s.goals[k] : DEFAULT().goals[k];
-  for (const [dk, es] of Object.entries(s.entries)) { if (!Array.isArray(es)) { delete s.entries[dk]; continue; } s.entries[dk] = es.filter(e => isObj(e) && isObj(e.food) && isObj(e.food.n) && Number.isFinite(+e.g)); }
+  for (const [dk, es] of Object.entries(s.entries)) {
+    if (!Array.isArray(es)) { delete s.entries[dk]; continue; }
+    const seen = new Set();
+    // Unknown fields on an entry are kept as-is (Claude may add notes etc.); only the known ones are normalised.
+    s.entries[dk] = es.filter(e => isObj(e) && isObj(e.food) && isObj(e.food.n) && Number.isFinite(+e.g)).map(e => {
+      if (!e.id || seen.has(e.id)) e.id = uid(); seen.add(e.id);
+      if (!STATUSES.includes(e.status)) e.status = 'eaten';
+      e.rev = Math.max(1, Math.floor(+e.rev) || 1);
+      return e;
+    });
+  }
+  // Tombstones (deleted entry ids per day) let a later sync tell "deleted" from "never seen". They expire after 60 days.
+  if (!isObj(s.tombstones)) s.tombstones = {};
+  const cutoff = Date.now() - TOMBSTONE_TTL_DAYS * 864e5;
+  for (const [dk, m] of Object.entries(s.tombstones)) {
+    if (!isObj(m)) { delete s.tombstones[dk]; continue; }
+    for (const [id, tb] of Object.entries(m)) if (!isObj(tb) || !(+tb.at > cutoff)) delete m[id];
+    if (!Object.keys(m).length) delete s.tombstones[dk];
+  }
   s.recents = s.recents.filter(f => isObj(f) && isObj(f.n));
   const st = s.settings;
   for (const k of ['waterGoal', 'glass', 'fastTarget', 'showWater', 'showFasting', 'onboarded', 'planStart']) delete st[k];
@@ -45,7 +64,7 @@ function sanitize(o) {
   // v6: new light design – earlier versions defaulted to dark, so switch everyone to light once.
   if (st.ui !== 6) { st.theme = 'light'; st.ui = 6; }
   if (!['light', 'dark', 'system'].includes(st.theme)) st.theme = 'light';
-  s.version = 4;
+  s.version = 5;
   return s;
 }
 function load() { try { return sanitize(JSON.parse(localStorage.getItem(KEY))); } catch { return DEFAULT(); } }
@@ -55,22 +74,39 @@ let S = load();
 // ---------- Nutrition ----------
 const NKEYS = ['kcal', 'p', 'c', 'f', 'fib', 'sug', 'salt'];
 const nutr = (food, g) => { const k = (+g || 0) / 100, n = food?.n || {}, o = {}; for (const key of NKEYS) o[key] = (+n[key] || 0) * k; return o; };
-function dayTotals(date) {
+// Totals, goals and "logged" only count eaten entries; planned ones are shown separately (projected totals).
+const isEaten = e => e.status !== 'planned';
+function totalsOf(entries) {
   const tot = Object.fromEntries(NKEYS.map(k => [k, 0]));
-  for (const e of S.entries[date] || []) { const n = nutr(e.food, e.g); for (const k in tot) tot[k] += n[k]; }
+  for (const e of entries) { const n = nutr(e.food, e.g); for (const k in tot) tot[k] += n[k]; }
   return tot;
 }
-const isLogged = d => (S.entries[d] || []).length > 0;
+const dayTotals = date => totalsOf((S.entries[date] || []).filter(isEaten));
+const plannedTotals = date => totalsOf((S.entries[date] || []).filter(e => !isEaten(e)));
+const isLogged = d => (S.entries[d] || []).some(isEaten);
 function streak() { let n = 0, d = today(); if (!isLogged(d)) d = addDays(d, -1); while (isLogged(d)) { n++; d = addDays(d, -1); } return n; }
 function mealDefault() { const h = new Date().getHours(); return h < 10 ? 'breakfast' : h < 15 ? 'lunch' : h < 21 ? 'dinner' : 'snacks'; }
 
 function addEntry(food, g, label, meal, date = ui.date, extra = {}) {
   const snap = { id: food.id, name: food.name, brand: food.brand || '', img: food.img || '', cat: food.cat || '', n: food.n, serving: food.serving || null, src: food.src, code: food.code || '' };
   if (food.micro) snap.micro = food.micro; if (food.ns) snap.ns = food.ns; if (food.nova) snap.nova = food.nova;
-  const e = { id: uid(), meal, g, label, food: snap, ...extra };
+  const e = { id: uid(), meal, status: 'eaten', rev: 1, g, label, food: snap, ...extra };
   (S.entries[date] ||= []).push(e);
   if (food.src !== 'quick') S.recents = [snap, ...S.recents.filter(x => x.id !== snap.id)].slice(0, 40);
   save(); return e;
+}
+// Every app-side change to an entry bumps its revision, so a later sync can order edits without trusting device clocks.
+function touch(e, patch = {}) { Object.assign(e, patch); e.rev = (+e.rev || 0) + 1; return e; }
+// Deleting leaves a tombstone, so a stale copy of the day can't bring the entry back.
+function removeEntry(date, e) {
+  const arr = S.entries[date] || [], i = arr.indexOf(e); if (i < 0) return -1;
+  arr.splice(i, 1); touch(e);
+  ((S.tombstones[date] ||= {})[e.id] = { rev: e.rev, at: Date.now() });
+  return i;
+}
+function restoreEntry(date, e, i = -1) {
+  if (S.tombstones[date]) { delete S.tombstones[date][e.id]; if (!Object.keys(S.tombstones[date]).length) delete S.tombstones[date]; }
+  touch(e); const arr = (S.entries[date] ||= []); arr.splice(i < 0 ? arr.length : i, 0, e);
 }
 const defaultPortion = f => f.serving?.g ? { g: f.serving.g, label: `1 × ${f.serving.label}`, unit: 'serv', qty: 1 } : { g: 100, label: '100 g', unit: 'g', qty: 100 };
 // ---------- Weekly insights ----------

@@ -98,7 +98,7 @@ function multiBar() {
     let k = 0; const n = picked.size, date = ui.date, added = [];
     for (const f of picked.values()) { const p = defaultPortion(f); added.push(addEntry(f, p.g, p.label, meal, date, { unit: p.unit, qty: p.qty })); k += nutr(f, p.g).kcal; }
     ui.targetMeal = null; go('diary');
-    undoable(t('{n} Lebensmittel · {k} kcal hinzugefügt', { n, k: de(k) }), () => { S.entries[date] = (S.entries[date] || []).filter(x => !added.includes(x)); save(); rerender(); });
+    undoable(t('{n} Lebensmittel · {k} kcal hinzugefügt', { n, k: de(k) }), () => { added.forEach(x => removeEntry(date, x)); save(); rerender(); });
   };
 }
 
@@ -149,7 +149,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
       const g = grams(); if (!(g > 0)) return toast(t('Bitte Menge eingeben')); if (g > 2e4) return toast(t('Menge zu groß'));
       const u = units.find(x => x[0] === ui2.value), q = num(qi.value, 0, 1e4);
       const label = u[0] === 'g' ? `${de(q)} g` : u[0] === 'ml' ? `${de(q)} ml` : `${de(q, q % 1 ? 1 : 0)} × ${u[0] === 'serv' ? food.serving.label || 'Portion' : 'Stück'}`;
-      if (entry) { Object.assign(entry, { g, label, meal, unit: u[0], qty: q }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
+      if (entry) { touch(entry, { g, label, meal, unit: u[0], qty: q }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
       const e = addEntry(food, g, label, meal, date, { unit: u[0], qty: q });
       closeSheet(); ui.targetMeal = null; go('diary', { date });
       undoable(t('{name} hinzugefügt', { name: food.name }), () => deleteSilently(date, e));

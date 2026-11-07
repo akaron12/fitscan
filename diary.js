@@ -28,7 +28,7 @@ function renderDiary(v) {
   if (!es.length && isLogged(addDays(d, -1))) html += `<button class="btn secondary block" id="copyDay">${I('undo')}${t('Ganzen Tag von gestern kopieren')}</button>`;
 
   for (const [id, name] of MEALS) {
-    const me = es.filter(e => e.meal === id), kc = me.reduce((a, e) => a + nutr(e.food, e.g).kcal, 0);
+    const me = es.filter(e => e.meal === id), kc = me.filter(isEaten).reduce((a, e) => a + nutr(e.food, e.g).kcal, 0);
     const canCopy = !me.length && (S.entries[addDays(d, -1)] || []).some(e => e.meal === id);
     html += `<section class="card meal"><header class="card-h"><h3>${t(name)}</h3><span class="card-v">${me.length ? de(kc) + ' kcal' : ''}</span></header>
       ${me.length ? `<div class="list">${me.map(entryRow).join('')}</div>` : ''}
@@ -57,13 +57,13 @@ function entryRow(e) {
 }
 function copyEntries(src, to) {
   if (!src?.length) return;
-  const copies = src.map(e => ({ ...e, id: uid() })); (S.entries[to] ||= []).push(...copies); save(); rerender();
-  undoable(t('{n} Einträge kopiert', { n: copies.length }), () => { const ids = new Set(copies.map(c => c.id)); S.entries[to] = S.entries[to].filter(x => !ids.has(x.id)); save(); rerender(); });
+  const copies = src.map(e => ({ ...e, id: uid(), status: 'eaten', rev: 1 })); (S.entries[to] ||= []).push(...copies); save(); rerender();
+  undoable(t('{n} Einträge kopiert', { n: copies.length }), () => { copies.forEach(c => removeEntry(to, c)); save(); rerender(); });
 }
 function deleteEntry(date, e) {
-  const arr = S.entries[date] || [], i = arr.indexOf(e); if (i < 0) return;
-  arr.splice(i, 1); save(); closeSheet(); rerender();
-  undoable(t('Eintrag gelöscht'), () => { (S.entries[date] ||= []).splice(i, 0, e); save(); rerender(); });
+  const i = removeEntry(date, e); if (i < 0) return;
+  save(); closeSheet(); rerender();
+  undoable(t('Eintrag gelöscht'), () => { restoreEntry(date, e, i); save(); rerender(); });
 }
 
 // ---------- Quick add ----------
@@ -84,7 +84,7 @@ function quickAddSheet(meal, entry = null) {
       const p = v('qaP'), c = v('qaC'), f = v('qaF'), kcal = v('qaK') || Math.round(p * 4 + c * 4 + f * 9);
       if (!kcal) return toast(t('Bitte Kalorien oder Makros eingeben'));
       const food = { id: entry?.food.id || 'quick:' + uid(), name: $('#qaN').value.trim() || t('Schnelleintrag'), cat: '', src: 'quick', n: { kcal, p, c, f, fib: 0, sug: 0, salt: 0 } };
-      if (entry) { Object.assign(entry, { food, meal }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
+      if (entry) { touch(entry, { food, meal }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
       const e = addEntry(food, 100, 'Schnelleintrag', meal, date, { quick: true });
       closeSheet(); ui.targetMeal = null; go('diary');
       undoable(t('{k} kcal hinzugefügt', { k: de(kcal) }), () => deleteSilently(date, e));
@@ -92,11 +92,11 @@ function quickAddSheet(meal, entry = null) {
     if (entry) $('#qaDel').onclick = () => deleteEntry(date, entry);
   });
 }
-function deleteSilently(date, e) { S.entries[date] = (S.entries[date] || []).filter(x => x !== e); save(); rerender(); }
+function deleteSilently(date, e) { removeEntry(date, e); save(); rerender(); }
 
 // ---------- Day details ----------
 function dayDetailSheet(d) {
-  const tt = dayTotals(d), mic = {}, cover = {}, es = S.entries[d] || [], g = S.goals;
+  const tt = dayTotals(d), mic = {}, cover = {}, es = (S.entries[d] || []).filter(isEaten), g = S.goals;
   for (const e of es) { const m = e.food.micro; if (!m) continue; for (const k in m) { mic[k] = (mic[k] || 0) + m[k] * e.g / 100; cover[k] = (cover[k] || 0) + 1; } }
   const kc = { p: tt.p * 4, c: tt.c * 4, f: tt.f * 9 }, tot = kc.p + kc.c + kc.f || 1;
   const row = (l, v, goal) => `<div class="row-item"><span class="grow">${l}</span><span class="row-val"><b>${v}</b>${goal ? `<span class="sub"> / ${goal}</span>` : ''}</span></div>`;
