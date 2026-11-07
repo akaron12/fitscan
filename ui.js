@@ -1,6 +1,6 @@
 'use strict';
 /* FitScan – UI shell: navigation, sheets, toasts and shared components. */
-let ui = { tab: 'diary', date: today(), targetMeal: null, libTab: 'recent', query: '', chart: { metric: 'weight', range: 90, type: 'line', smooth: 'ema', meas: 'waist' } };
+let ui = { tab: 'diary', date: today(), targetMeal: null, libTab: 'recent', query: '', chart: { metric: 'kcal', range: 30, type: 'bar', smooth: 'ma7' } };
 
 // ---------- Toast ----------
 function toast(msg, action) {
@@ -58,7 +58,7 @@ function applyTheme() {
 mqDark.addEventListener?.('change', () => { if (S.settings.theme === 'system') { applyTheme(); render(); } });
 
 // ---------- Navigation ----------
-const TITLES = { diary: 'Tagebuch', library: 'Lebensmittel', progress: 'Fortschritt', profile: 'Profil' };
+const TITLES = { diary: 'Tagebuch', library: 'Lebensmittel', progress: 'Fortschritt', profile: 'Einstellungen' };
 function go(tab, opts = {}) { if (tab !== 'library') endMulti(); ui.tab = tab; Object.assign(ui, opts); window.scrollTo(0, 0); render(); }
 function render() {
   $$('.tabbar [data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === ui.tab));

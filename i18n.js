@@ -2,7 +2,8 @@
 /* FitScan i18n: German source strings are the keys; t() looks up English and fills {placeholders}. */
 const EN = {
   // Navigation & common
-  'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Scannen': 'Scan', 'Heute': 'Today', 'Gestern': 'Yesterday', 'Morgen': 'Tomorrow',
+  'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Einstellungen': 'Settings', 'Kalorien- und Makroziele eintragen': 'Enter your calorie and macro goals', 'Kalorien und Makros pro Tag.': 'Calories and macros per day.',
+  'Tagebuch, eigene Lebensmittel und Einstellungen werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden.': 'Your diary, custom foods and settings will be removed from this device. This cannot be undone.', 'Scannen': 'Scan', 'Heute': 'Today', 'Gestern': 'Yesterday', 'Morgen': 'Tomorrow',
   'Abbrechen': 'Cancel', 'Schließen': 'Close', 'Speichern': 'Save', 'Löschen': 'Delete', 'Hinzufügen': 'Add', 'Weiter': 'Next', 'Zurück': 'Back', 'Fertig': 'Done', 'Auswählen': 'Select',
   'Rückgängig': 'Undo', 'Gespeichert': 'Saved', 'Gelöscht': 'Deleted', 'Details': 'Details', 'Datum': 'Date', 'Name': 'Name', 'Entfernen': 'Remove', 'Laden': 'Load', 'Importieren': 'Import',
   'Vorherige Woche': 'Previous week', 'Nächste Woche': 'Next week', 'Mahlzeit': 'Meal', 'Menge': 'Amount', 'Einheit': 'Unit', 'Fällig': 'Due', 'Auto': 'Auto',

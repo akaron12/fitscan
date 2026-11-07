@@ -25,29 +25,27 @@ const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 const mealName = id => t(MEALS.find(m => m[0] === id)?.[1] || 'Snacks');
 
 // ---------- State ----------
-const DEFAULT = () => ({ profile: null, goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false }, entries: {}, weights: {},
-  foods: {}, products: {}, recipes: {}, recents: [], favorites: {}, water: {}, measures: {}, checkins: [], scanHistory: [], fast: null, fastLog: [],
+const DEFAULT = () => ({ goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false }, entries: {},
+  foods: {}, products: {}, recipes: {}, recents: [], favorites: {}, scanHistory: [],
   settings: { theme: 'light', lang: null } });
+// Data removed from the app (weight, water, fasting, profile, check-ins) is dropped on load.
+const REMOVED_KEYS = ['profile', 'weights', 'water', 'measures', 'checkins', 'fast', 'fastLog'];
 function sanitize(o) {
   const d = DEFAULT(); if (!isObj(o)) o = {};
   const s = Object.assign(d, o);
-  for (const k of ['goals', 'entries', 'weights', 'foods', 'products', 'recipes', 'favorites', 'settings', 'water', 'measures']) if (!isObj(s[k])) s[k] = DEFAULT()[k];
-  for (const k of ['recents', 'checkins', 'scanHistory', 'fastLog']) if (!Array.isArray(s[k])) s[k] = [];
+  for (const k of REMOVED_KEYS) delete s[k];
+  for (const k of ['goals', 'entries', 'foods', 'products', 'recipes', 'favorites', 'settings']) if (!isObj(s[k])) s[k] = DEFAULT()[k];
+  for (const k of ['recents', 'scanHistory']) if (!Array.isArray(s[k])) s[k] = [];
   for (const k of ['kcal', 'p', 'c', 'f']) s.goals[k] = Number.isFinite(+s.goals[k]) ? +s.goals[k] : DEFAULT().goals[k];
-  if (!isObj(s.profile)) s.profile = null;
-  for (const [dk, w] of Object.entries(s.weights)) { const x = +w; if (!/^\d{4}-\d{2}-\d{2}$/.test(dk) || !(x > 0)) delete s.weights[dk]; else s.weights[dk] = x; }
   for (const [dk, es] of Object.entries(s.entries)) { if (!Array.isArray(es)) { delete s.entries[dk]; continue; } s.entries[dk] = es.filter(e => isObj(e) && isObj(e.food) && isObj(e.food.n) && Number.isFinite(+e.g)); }
   s.recents = s.recents.filter(f => isObj(f) && isObj(f.n));
-  if (s.fast && !(+s.fast.start > 0 && +s.fast.start <= Date.now())) s.fast = null;
-  s.fastLog = s.fastLog.filter(x => x && Number.isFinite(+x.h));
   const st = s.settings;
-  st.waterGoal ||= 2500; st.glass ||= 250; st.fastTarget ||= 16;
-  st.continuousScan ??= false; st.beep ??= true; st.showWater ??= true; st.showFasting ??= !!(s.fast || s.fastLog.length);
-  if (s.profile && st.onboarded == null) st.onboarded = true;
+  for (const k of ['waterGoal', 'glass', 'fastTarget', 'showWater', 'showFasting', 'onboarded', 'planStart']) delete st[k];
+  st.continuousScan ??= false; st.beep ??= true;
   // v6: new light design – earlier versions defaulted to dark, so switch everyone to light once.
   if (st.ui !== 6) { st.theme = 'light'; st.ui = 6; }
   if (!['light', 'dark', 'system'].includes(st.theme)) st.theme = 'light';
-  s.version = 3;
+  s.version = 4;
   return s;
 }
 function load() { try { return sanitize(JSON.parse(localStorage.getItem(KEY))); } catch { return DEFAULT(); } }
@@ -75,60 +73,12 @@ function addEntry(food, g, label, meal, date = ui.date, extra = {}) {
   save(); return e;
 }
 const defaultPortion = f => f.serving?.g ? { g: f.serving.g, label: `1 × ${f.serving.label}`, unit: 'serv', qty: 1 } : { g: 100, label: '100 g', unit: 'g', qty: 100 };
-
-// ---------- Goals (Mifflin-St Jeor) ----------
-const ACT = [[1.2, 'Kaum aktiv', 'Bürojob, wenig Sport'], [1.375, 'Leicht aktiv', '1–3× Sport pro Woche'], [1.55, 'Mäßig aktiv', '3–5× Sport pro Woche'], [1.725, 'Sehr aktiv', '6–7× Sport pro Woche'], [1.9, 'Extrem aktiv', 'Körperliche Arbeit und Sport']];
-const GOALS = [['lose', 'Abnehmen', 'Fett verlieren, Muskeln erhalten'], ['maintain', 'Gewicht halten', 'Gesund essen, Form halten'], ['gain', 'Aufbauen', 'Muskeln und Gewicht zulegen']];
-const goalDelta = p => p.goal === 'maintain' ? 0 : (p.goal === 'lose' ? -1 : 1) * p.rate * 7700 / 7;
-const kcalFloor = p => p.sex === 'm' ? 1500 : 1200;
-function macrosFor(kcal, weight, goal) { const p = Math.round(weight * (goal === 'lose' ? 2.0 : 1.8)), f = Math.round(kcal * 0.27 / 9); return { kcal, p, f, c: Math.max(0, Math.round((kcal - p * 4 - f * 9) / 4)) }; }
-function computeGoals(p) {
-  const bmr = 10 * p.weight + 6.25 * p.height - 5 * p.age + (p.sex === 'm' ? 5 : -161), tdee = bmr * p.activity;
-  const kcal = Math.max(kcalFloor(p), Math.round((tdee + goalDelta(p)) / 10) * 10);
-  return { bmr: Math.round(bmr), tdee: Math.round(tdee), ...macrosFor(kcal, p.weight, p.goal) };
-}
-
-// ---------- Weight trend & expenditure ----------
-function weightSeries() {
-  const ds = Object.keys(S.weights).sort(); if (!ds.length) return [];
-  const end = ds.at(-1) > today() ? ds.at(-1) : today(), out = []; let trend = null;
-  for (let d = ds[0]; d <= end; d = addDays(d, 1)) { const w = S.weights[d]; if (w != null) trend = trend == null ? w : trend + 0.1 * (w - trend); out.push({ d, w: w ?? null, t: trend }); }
-  return out;
-}
-const trendAt = (series, d) => series.find(s => s.d === d)?.t ?? null;
-const weeklyRate = series => series.length < 8 ? null : series.at(-1).t - series.at(-8).t;
-function estimateTDEE(end = today(), windows = [28, 21, 14], series = weightSeries()) {
-  if (!series.length) return null;
-  for (const N of windows) {
-    const start = addDays(end, -N), tS = trendAt(series, start), tE = trendAt(series, end) ?? (end === today() ? series.at(-1).t : null);
-    if (tS == null || tE == null) continue;
-    const days = []; for (let d = addDays(start, 1); d <= end; d = addDays(d, 1)) if (isLogged(d)) days.push(dayTotals(d).kcal);
-    const nW = Object.keys(S.weights).filter(d => d > start && d <= end).length;
-    if (days.length < N * 0.7 || nW < N * 0.4) continue;
-    const avgIn = avg(days);
-    return { tdee: Math.round((avgIn - (tE - tS) * 7700 / N) / 10) * 10, avgIn: Math.round(avgIn), change: tE - tS, N, logged: days.length };
-  }
-  return null;
-}
+// ---------- Weekly insights ----------
 function insights() {
   const days = n => Array.from({ length: n }, (_, i) => addDays(today(), -i)), g = S.goals;
   const stat = arr => { const tt = arr.filter(isLogged).map(dayTotals), a = k => avg(tt.map(x => x[k])) || 0;
     return { n: tt.length, kcal: a('kcal'), p: a('p'), adh: tt.filter(x => Math.abs(x.kcal - g.kcal) <= g.kcal * 0.1).length, ph: tt.filter(x => x.p >= g.p * 0.9).length }; };
   return { cur: stat(days(7)), prev: stat(days(14).slice(7)) };
-}
-
-// ---------- Weekly check-in ----------
-function checkinData() {
-  if (!S.profile) return null;
-  const ws = weightSeries(), w = ws.at(-1)?.t || S.profile.weight, est = estimateTDEE();
-  const tdee = est ? est.tdee : computeGoals({ ...S.profile, weight: w }).tdee;
-  const kcal = Math.max(kcalFloor(S.profile), Math.round((tdee + goalDelta(S.profile)) / 10) * 10);
-  return { est, tdee, kcal, macros: macrosFor(kcal, w, S.profile.goal), old: { ...S.goals }, source: est ? 'data' : 'formula', rate: weeklyRate(ws) };
-}
-function checkinDue() {
-  if (!S.profile) return false;
-  const last = S.checkins.at(-1)?.date || S.settings.planStart || Object.keys(S.entries).sort()[0];
-  return !!last && daysBetween(last, today()) >= 7;
 }
 
 // ---------- Open Food Facts ----------
@@ -218,27 +168,3 @@ function pushScan(code) { S.scanHistory = [{ code, t: Date.now() }, ...S.scanHis
 // ---------- Export ----------
 const csv = rows => '﻿' + rows.map(r => r.map(x => { const s = String(x ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\n');
 function download(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
-
-// ---------- Demo data ----------
-function seedDemo() {
-  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const F = n => BASE_FOODS.find(f => f.name === n);
-  const plans = { breakfast: [['Haferflocken', 70], ['Milch 1,5%', 250], ['Banane', 120], ['Heidelbeeren', 80]], lunch: [['Hähnchenbrust gebraten', 160], ['Reis weiß gekocht', 220], ['Brokkoli', 180], ['Olivenöl', 10]],
-    dinner: [['Vollkornbrot', 100], ['Gouda', 40], ['Kochschinken', 40], ['Tomate', 120], ['Skyr', 150]], snacks: [['Apfel', 180], ['Mandeln', 25], ['Proteinriegel', 60]] };
-  S.profile ||= { sex: 'm', age: 32, height: 182, weight: 86, activity: 1.375, goal: 'lose', rate: 0.5 };
-  const c = computeGoals(S.profile); if (!S.goals.manual) S.goals = { kcal: c.kcal, p: c.p, c: c.c, f: c.f, manual: false };
-  const start = addDays(today(), -42); let w = 86.4;
-  const push = (d, meal, f, g) => S.entries[d].push({ id: uid(), meal, g, label: g + ' g', unit: 'g', qty: g, food: { id: f.id, name: f.name, cat: f.cat, n: f.n, src: 'base', serving: f.serving } });
-  for (let i = 0; i <= 42; i++) {
-    const d = addDays(start, i); S.entries[d] = [];
-    for (const m in plans) for (const [n, g] of plans[m]) { if ((m === 'snacks' && rnd() < 0.3) || (i === 42 && (m === 'dinner' || m === 'snacks'))) continue; push(d, m, F(n), Math.round(g * (0.8 + rnd() * 0.45))); }
-    if (rnd() < 0.25 && i < 42) push(d, 'dinner', F('Pizza Margherita'), 175);
-    w += -0.075 + (rnd() - 0.5) * 0.08; const noisy = w + (rnd() - 0.5) * 0.9 + (i % 7 === 6 ? 0.4 : 0);
-    if (rnd() < 0.85 || i === 42) S.weights[d] = r1(noisy);
-    S.water[d] = Math.round((1500 + rnd() * 1500) / 250) * 250;
-    if (i % 7 === 0) S.measures[d] = { waist: r1(94 - i * 0.07 + (rnd() - .5) * .6), hip: r1(102 - i * 0.04), chest: r1(104 - i * 0.02), arm: r1(36 + (rnd() - .5) * .3), bf: r1(22 - i * 0.05) };
-  }
-  S.profile.weight = S.weights[today()];
-  S.recents = dedupe([...Object.values(plans).flat().map(([n]) => F(n)), F('Pizza Margherita'), ...S.recents]).slice(0, 40);
-  S.settings.planStart = start; S.checkins = []; S.settings.onboarded = true; save();
-}
