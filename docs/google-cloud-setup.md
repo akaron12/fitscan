@@ -3,7 +3,7 @@
 The app signs in with Google directly from the browser (Google Identity Services, token model). You need your own OAuth client. It costs nothing and takes about 10 minutes. Google's console wording changes now and then; if a label differs slightly, look for the closest match.
 
 ## 1. Create a project
-1. Open https://console.cloud.google.com and sign in as **adammkaron@gmail.com**. This is the account whose Drive holds the `AI Memory` folder. Create the project under it too, to keep everything in one account.
+1. Open https://console.cloud.google.com and sign in with **the Google account whose Drive holds your `AI Memory` folder**. Create the project under that same account, to keep everything in one account.
 2. Top bar project picker → **New project** → name it `meal-tracker` → **Create**. Make sure it is the selected project.
 
 ## 2. Enable the Drive API
@@ -34,6 +34,6 @@ The app signs in with Google directly from the browser (Google Identity Services
 Paste the Client ID into the chat. Do not paste any password or secret.
 
 ## Notes
-- Always sign in to the app with **adammkaron@gmail.com**. Any other account would create a separate `Meal Tracker` folder in the wrong Drive, and Claude's planned meals would not appear.
+- Always sign in to the app with **the same Google account that holds `AI Memory`**. Any other account would create a separate `Meal Tracker` folder in the wrong Drive, and Claude's planned meals would not appear.
 - All GitHub Pages sites under `akaron12.github.io` share one browser origin. The plan covers this with escaping and a strict Content-Security-Policy. If you host other apps there, consider a custom domain for this one later.
 - On iPhone the sign-in is tested in step 6 of the build plan. If the popup does not work in the installed home-screen app, the fallback is to sign in through Safari.
