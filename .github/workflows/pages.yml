@@ -1,0 +1,56 @@
+# Deploys the app to GitHub Pages and stamps the service-worker cache version with the commit,
+# so every deploy gets a fresh offline cache and installed copies show "update available".
+#
+# One-time switch needed: repository Settings -> Pages -> Build and deployment -> Source: "GitHub Actions"
+# (instead of "Deploy from a branch"). Until then this workflow does nothing useful.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble the site (only what the app needs) and stamp the cache version
+        run: |
+          mkdir _site
+          cp index.html privacy.html manifest.webmanifest style.css *.js _site/
+          cp -r icons vendor _site/
+          mkdir _site/docs && cp docs/FORMAT.md _site/docs/
+          touch _site/.nojekyll
+          sed -i "s/^const V = '[^']*'/const V = 'fitscan-${GITHUB_SHA::7}'/" _site/sw.js
+          grep -n "^const V" _site/sw.js
+
+      - name: Check that every file the service worker caches exists
+        run: |
+          node -e "
+            const fs = require('fs'), src = fs.readFileSync('_site/sw.js', 'utf8');
+            const shell = eval(/const SHELL = (\[[^\]]*\])/.exec(src)[1]);
+            const missing = shell.filter(f => f !== './' && !fs.existsSync('_site/' + f));
+            if (missing.length) { console.error('Missing from the site:', missing.join(', ')); process.exit(1); }
+            console.log('service worker cache list OK (' + shell.length + ' files)');
+          "
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -3,6 +3,8 @@
 const EN = {
   // Navigation & common
   'Tagebuch': 'Diary', 'Lebensmittel': 'Foods', 'Fortschritt': 'Progress', 'Profil': 'Profile', 'Einstellungen': 'Settings',
+  'Update verfügbar': 'Update available', 'Neu laden': 'Reload', 'Produktdaten © Open-Food-Facts-Mitwirkende, Lizenz': 'Product data © Open Food Facts contributors, licence', 'Allgemeine Lebensmittel: USDA FoodData Central (gemeinfrei).': 'Generic foods: USDA FoodData Central (public domain).',
+  'Daten: USDA FoodData Central (gemeinfrei) – Durchschnittswerte pro 100 g.': 'Data: USDA FoodData Central (public domain) – average values per 100 g.',
   'Nicht gefunden': 'Not found', 'Wartet auf Netz': 'Waiting for network', 'USDA-Suche aktivieren': 'Turn on USDA search', 'Keine Treffer bei USDA.': 'No USDA results.',
   'Für Lebensmittel ohne Barcode, z. B. „Hähnchenbrust roh“: kostenlosen API-Key in den Einstellungen eintragen': 'For foods without a barcode, e.g. “chicken breast raw”: add a free API key in Settings',
   'USDA hat den API-Key abgelehnt. Bitte in den Einstellungen prüfen.': 'USDA rejected the API key. Please check it in Settings.', 'USDA-Limit erreicht (ca. 1.000 Suchen pro Stunde). Später erneut versuchen.': 'USDA limit reached (about 1,000 searches per hour). Try again later.',

@@ -71,7 +71,10 @@
   function normaliseEntry(o) {
     const e = {}, x = {};
     for (const [k, v] of Object.entries(o)) (KEY_ORDER.includes(k) ? e : x)[k] = v;
-    if (e.id !== undefined && e.id !== null) e.id = String(e.id); else delete e.id;
+    if (e.id !== undefined && e.id !== null) {
+      e.id = String(e.id);   // ids end up in HTML attributes and as map keys: keep them boring
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(e.id)) throw new YamlError('id may only contain letters, digits, - and _ (max 64 characters)');
+    } else delete e.id;
     const lower = v => typeof v === 'string' ? v.trim().toLowerCase() : v;
     e.meal = lower(e.meal); e.status = lower(e.status);
     if (!MEAL_IDS.includes(e.meal)) throw new YamlError(`meal must be one of ${MEAL_IDS.join(', ')}`);
@@ -84,6 +87,8 @@
       if (!isNum(e.kcal) || e.kcal < 0) throw new YamlError('kcal must be a number (0 or more)');
       for (const k of ['p', 'c', 'f']) { if (e[k] == null) e[k] = 0; if (e[k] < 0) throw new YamlError(k + ' must not be negative'); }
     }
+    if (e.nutriscore != null) { e.nutriscore = String(e.nutriscore).trim().toLowerCase(); if (!/^[a-e]$/.test(e.nutriscore)) throw new YamlError('nutriscore must be a, b, c, d or e'); }
+    if (e.nova != null && !(Number.isInteger(e.nova) && e.nova >= 1 && e.nova <= 4)) throw new YamlError('nova must be 1, 2, 3 or 4');
     if (e.rev != null) e.rev = Math.max(1, Math.floor(e.rev)); else delete e.rev;
     for (const k of Object.keys(e)) if (e[k] === null || e[k] === undefined) delete e[k];
     if (e.deleted !== true) delete e.deleted;

@@ -7,6 +7,7 @@ JSC=/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers
 status=0
 echo "== day file";  "$JSC" dayfile.js tests/dayfile.test.js || status=1
 echo "== drive client"; "$JSC" dayfile.js driveclient.js tests/fake-drive.js tests/drive.test.js || status=1
+echo "== security (CSP, inline code, service worker list)"; "$JSC" tests/security.test.js || status=1
 echo "== usda"; "$JSC" usda.js tests/usda.test.js || status=1
 echo "== merge"; "$JSC" dayfile.js merge.js tests/merge.test.js || status=1
 echo "== sync engine"; "$JSC" dayfile.js merge.js driveclient.js sync.js tests/fake-drive.js tests/sync.test.js || status=1

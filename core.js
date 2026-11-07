@@ -47,7 +47,7 @@ function sanitize(o) {
     const seen = new Set();
     // Unknown fields on an entry are kept as-is (Claude may add notes etc.); only the known ones are normalised.
     s.entries[dk] = es.filter(e => isObj(e) && isObj(e.food) && isObj(e.food.n) && Number.isFinite(+e.g)).map(e => {
-      if (!e.id || seen.has(e.id)) e.id = uid(); seen.add(e.id);
+      if (!e.id || seen.has(e.id) || !/^[A-Za-z0-9_-]{1,64}$/.test(String(e.id))) e.id = uid(); seen.add(e.id);   // ids go into HTML attributes: boring characters only (a backup or file could carry anything)
       if (!STATUSES.includes(e.status)) e.status = 'eaten';
       e.rev = Math.max(1, Math.floor(+e.rev) || 1);
       return e;

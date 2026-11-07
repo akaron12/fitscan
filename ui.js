@@ -3,12 +3,12 @@
 let ui = { tab: 'diary', date: today(), targetMeal: null, libTab: 'recent', query: '', chart: { metric: 'kcal', range: 30, type: 'bar', smooth: 'ma7' } };
 
 // ---------- Toast ----------
-function toast(msg, action) {
+function toast(msg, action, ms) {
   const el = $('#toast');
   el.innerHTML = `<span>${esc(msg)}</span>${action ? `<button>${esc(action.label)}</button>` : ''}`;
   if (action) el.querySelector('button').onclick = () => { el.classList.remove('show'); action.fn(); };
   el.classList.toggle('actionable', !!action); el.classList.add('show');
-  clearTimeout(el._h); el._h = setTimeout(() => el.classList.remove('show'), action ? 5000 : 2200);
+  clearTimeout(el._h); el._h = setTimeout(() => el.classList.remove('show'), ms || (action ? 5000 : 2200));
 }
 const undoable = (msg, fn) => toast(msg, { label: t('Rückgängig'), fn });
 
@@ -85,12 +85,18 @@ function ring(val, goal, size, stroke, color = 'var(--acc)') {
 }
 function foodIcon(f, big = false) {
   const cls = `thumb${big ? ' big' : ''}`, initial = esc(String(f.name || '?').trim().charAt(0).toUpperCase());
-  if (f.img) return `<img class="${cls} img" src="${esc(f.img)}" loading="lazy" alt="${initial}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'${cls}',textContent:this.alt}))">`;
+  if (f.img) return `<img class="${cls} img" src="${esc(f.img)}" loading="lazy" alt="${initial}">`;   // a broken image falls back to the initial: see the capture listener below (no inline handlers: CSP)
   const ic = f.src === 'recipe' ? 'utensils' : f.src === 'custom' ? 'pen' : f.src === 'quick' ? 'zap' : null;
   return `<div class="${cls}">${ic ? I(ic) : initial}</div>`;
 }
-const nsMini = g => g && NS_COL[g] ? `<span class="nsm" style="background:${NS_COL[g]}">${g.toUpperCase()}</span>` : '';
-const nutriBadge = g => g && NS_COL[g] ? `<span class="ns" style="background:${NS_COL[g]}">Nutri-Score ${g.toUpperCase()}</span>` : '';
+// Image load errors do not bubble, so listen in the capture phase. Replaces the broken <img> by a lettered tile.
+document.addEventListener('error', e => {
+  const im = e.target; if (!(im instanceof HTMLImageElement) || !im.classList.contains('img')) return;
+  im.replaceWith(Object.assign(document.createElement('div'), { className: im.className.replace(/\bimg\b/, '').trim(), textContent: im.alt }));
+}, true);
+const isNs = g => typeof g === 'string' && /^[a-e]$/.test(g);   // never trust a lookup key from outside data (e.g. "constructor")
+const nsMini = g => isNs(g) ? `<span class="nsm" style="background:${NS_COL[g]}">${g.toUpperCase()}</span>` : '';
+const nutriBadge = g => isNs(g) ? `<span class="ns" style="background:${NS_COL[g]}">Nutri-Score ${g.toUpperCase()}</span>` : '';
 const seg = (id, opts, val, cls = '') => `<div class="seg ${cls}" id="${id}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" class="${String(v) === String(val) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 function bindSeg(root, id, fn) { $$(`#${id} button`, root).forEach(b => b.onclick = () => { $$(`#${id} button`, root).forEach(x => x.classList.toggle('on', x === b)); fn(b.dataset.v); }); }
 const segVal = (root, id) => $(`#${id} .on`, root)?.dataset.v;

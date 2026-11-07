@@ -31,7 +31,8 @@ function renderProfile(v) {
     <label class="row-item nav"><span class="row-ic">${I('upload')}</span><span class="grow"><span class="nm">${t('Backup importieren')}</span><span class="sub">${t('Ersetzt die aktuellen Daten')}</span></span>${I('chevR', 'chev')}<input type="file" id="imJson" accept=".json,application/json" hidden></label>
     ${navRow('exCsv', 'file', t('Tagebuch als CSV'))}</div>
   <div class="card list"><button class="row-item danger-row" id="wipe">${t('Alle Daten löschen')}</button></div>
-  <p class="foot">${t('Alles bleibt auf diesem Gerät – kein Konto, keine Cloud, keine Paywall.')}<br>${t('{p} Produkte offline · {b} Basis-Lebensmittel', { p: Object.keys(S.products).length, b: BASE_FOODS.length })} · <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a></p>`;
+  <p class="foot">${t('Alles bleibt auf diesem Gerät – kein Konto, keine Cloud, keine Paywall.')}<br>${t('{p} Produkte offline · {b} Basis-Lebensmittel', { p: Object.keys(S.products).length, b: BASE_FOODS.length })} · <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a></p>
+  <p class="foot">${t('Produktdaten © Open-Food-Facts-Mitwirkende, Lizenz')} <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a>. ${t('Allgemeine Lebensmittel: USDA FoodData Central (gemeinfrei).')}</p>`;
 
   $('#pGoals').onclick = goalsSheet; window.bindSyncCard?.();
   $('#sUsda').onchange = e => { USDA.setKey(e.target.value); e.target.value = USDA.getKey(); toast(t(USDA.getKey() ? 'USDA-Key gespeichert' : 'USDA-Key entfernt')); };
@@ -83,5 +84,11 @@ function setLang(l) { S.settings.lang = l; applyLang(l); }
 setLang(S.settings.lang || (/^de\b/i.test(navigator.language || '') ? 'de' : 'en'));
 applyTheme();
 render();
-if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  const hadController = !!navigator.serviceWorker.controller;   // false on the very first visit: nothing to update then
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {   // a new version took over: the page still runs the old code until it reloads
+    if (hadController) toast(t('Update verfügbar'), { label: t('Neu laden'), fn: () => location.reload() }, 60000);
+  });
+}
 window.FitScan = { lookupBarcode, searchOFF, dayTotals, decodeImageFile, scoreFood, streak, get state() { return S; } };

@@ -148,7 +148,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
     ${editable ? `<button class="btn plain block" id="fsEdit">${t(editable === 'recipe' ? 'Gericht bearbeiten' : 'Lebensmittel bearbeiten')}</button>` : ''}
     <div class="sec"><h4>${t('Nährwerte')}</h4><span class="cols"><span>100 g</span>${sv ? `<span>${t('Portion')}</span>` : ''}</span></div>
     <div class="card list ntable">${nrow(t('Energie'), 'kcal', 'kcal', 0)}${nrow(t('Protein'), 'p', 'g', 1)}${nrow(t('Kohlenhydrate'), 'c', 'g', 1)}${nrow(t('davon Zucker'), 'sug', 'g', 1, ' micro')}${nrow(t('Fett'), 'f', 'g', 1)}${nrow(t('Ballaststoffe'), 'fib', 'g', 1)}${nrow(t('Salz'), 'salt', 'g', 2)}${micros}</div>
-    ${food.src === 'off' ? `<p class="hint">${t('Daten: Open Food Facts (ODbL) – Angaben können unvollständig sein.')}</p>` : ''}`, sh => {
+    ${food.src === 'off' ? `<p class="hint">${t('Daten: Open Food Facts (ODbL) – Angaben können unvollständig sein.')}</p>` : ''}${food.src === 'usda' ? `<p class="hint">${t('Daten: USDA FoodData Central (gemeinfrei) – Durchschnittswerte pro 100 g.')}</p>` : ''}`, sh => {
     const qi = $('#fsQty'), ui2 = $('#fsUnit');
     const grams = () => num(qi.value, 0, 1e4) * units.find(x => x[0] === ui2.value)[2];
     const live = () => { const n = nutr(food, grams());

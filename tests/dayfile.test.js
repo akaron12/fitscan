@@ -81,8 +81,16 @@ const bad = {
   'nested map': '  - meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1\n    extra:\n      a: 1',
   'duplicate key': '  - meal: lunch\n    meal: dinner\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1',
   'negative macro': '  - meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1\n    p: -3',
+  'attribute-breaking id': '  - id: "x\\" onmouseover=\\"alert(1)"\n    meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1',
+  'id with markup': '  - id: "<img src=x>"\n    meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1',
+  'id too long': '  - id: ' + 'a'.repeat(65) + '\n    meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1',
+  'prototype-key nutriscore': '  - meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1\n    nutriscore: constructor',
+  'nova out of range': '  - meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1\n    nova: 7',
 };
 for (const [name, body] of Object.entries(bad)) { const r = parse(mk(body)); eq([entries(r).length, raws(r).length], [0, 1], 'raw: ' + name); ok(serialize(r).includes(body.split('\n')[0]), 'raw kept: ' + name); }
+
+// 6b. boring ids, a-e nutriscore (any case) and nova 1-4 are fine
+m = parse(mk('  - id: Ab_9-z\n    meal: lunch\n    status: eaten\n    food: X\n    qty_g: 1\n    kcal: 1\n    nutriscore: B\n    nova: 4')); eq([entries(m).length, entries(m)[0].id, entries(m)[0].nutriscore, entries(m)[0].nova], [1, 'Ab_9-z', 'b', 4], 'safe id, nutriscore and nova accepted');
 
 // 7. macros optional (default 0)
 m = parse(mk('  - meal: snacks\n    status: planned\n    food: Apple\n    qty_g: 180\n    kcal: 95')); eq([entries(m)[0].p, entries(m)[0].c, entries(m)[0].f], [0, 0, 0], 'p/c/f default to 0');
