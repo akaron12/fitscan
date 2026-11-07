@@ -103,7 +103,7 @@ const segVal = (root, id) => $(`#${id} .on`, root)?.dataset.v;
 const MEAL_SHORT = { breakfast: 'Frühstück', lunch: 'Mittag', dinner: 'Abend', snacks: 'Snacks' };
 const mealSeg = (meal, id = 'mealSeg') => seg(id, MEALS.map(([k]) => [k, t(MEAL_SHORT[k])]), meal);
 const field = (id, label, val = '', { unit = '', ph = '', mode = 'decimal' } = {}) => `<label class="field"><span>${label}</span><span class="field-in"><input id="${id}" type="text" inputmode="${mode}" autocomplete="off" value="${esc(val ?? '')}" placeholder="${esc(ph)}">${unit ? `<em>${unit}</em>` : ''}</span></label>`;
-const inputNum = x => x == null || x === '' ? '' : String(r1(x)).replace('.', LANG === 'de' ? ',' : '.');
+const inputNum = x => x == null || x === '' ? '' : String(r1(x));   // decimal point (typed commas are still accepted by num())
 const emptyState = (icon, text) => `<div class="empty">${I(icon)}<p>${text}</p></div>`;
 const navRow = (id, icon, title, sub = '', val = '') => `<button class="row-item nav" id="${id}">${icon ? `<span class="row-ic">${I(icon)}</span>` : ''}<span class="grow"><span class="nm">${title}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</span>${val ? `<span class="row-val">${val}</span>` : ''}${I('chevR', 'chev')}</button>`;
 const stat = (label, value, unit = '', note = '') => `<div class="stat"><span class="stat-l">${label}</span><span class="stat-v">${value}${unit ? `<small>${unit}</small>` : ''}</span>${note ? `<span class="stat-n">${note}</span>` : ''}</div>`;

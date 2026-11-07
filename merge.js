@@ -144,5 +144,97 @@
   }
   const parseEntries = m => m.items.filter(it => it.kind === 'entry').map(it => it.entry);
 
-  root.DayMerge = { mergeDay, makeBase, unionModels, canon, keyOf };
+  // ---------- library: custom foods + favorites (settings.md) ----------
+  // Items are matched by id. The higher rev wins; equal revs with different content are decided by the content itself (the same
+  // answer on every device, so they converge). Deleting leaves a tombstone with rev = last rev + 1; an item only survives a tombstone
+  // if its rev is higher. Anything unreadable in the file is rejected as a whole (readLibrary) so we never write over hand edits we could not read.
+  const LIB_ID = /^[A-Za-z0-9:_.-]{1,80}$/, NK = ['kcal', 'p', 'c', 'f', 'fib', 'sug', 'salt'];
+  const stableJson = o => JSON.stringify(Array.isArray(o) ? o.map(stableObj) : stableObj(o));
+  const stableObj = o => o && typeof o === 'object' && !Array.isArray(o) ? Object.fromEntries(Object.keys(o).sort().map(k => [k, stableObj(o[k])])) : Array.isArray(o) ? o.map(stableObj) : o;
+  const libCanon = f => { const { rev, ...rest } = f; return stableJson(rest); };
+
+  /** A food from outside (the file) or from local storage, reduced to known fields. strict: reject wrong types instead of coercing. */
+  function cleanFood(o, strict) {
+    const bad = m => { throw new Error(m); };
+    if (!o || typeof o !== 'object' || Array.isArray(o)) bad('not an object');
+    if (typeof o.id !== 'string' || !LIB_ID.test(o.id)) bad('id missing or has unusual characters');
+    if (typeof o.name !== 'string' || !o.name.trim()) bad('name missing');
+    const str = (k, max) => { const v = o[k]; if (v == null || v === '') return ''; if (typeof v !== 'string') { if (strict) bad(k + ' must be text'); return ''; } return v.slice(0, max); };
+    const num = (v, max, what) => { if (v == null) return 0; if (typeof v !== 'number' || !Number.isFinite(v)) { if (strict) bad(what + ' must be a number'); return 0; } return r1(Math.min(max, Math.max(0, v))); };
+    let src = o.src == null ? 'custom' : o.src; if (typeof src !== 'string' || !/^[a-z]{1,12}$/.test(src)) { if (strict) bad('src invalid'); src = 'custom'; }
+    const n0 = o.n && typeof o.n === 'object' && !Array.isArray(o.n) ? o.n : (strict ? bad('n (nutrition per 100 g) missing') : {});
+    const f = { id: o.id, name: o.name.trim().slice(0, 200), brand: str('brand', 200), img: str('img', 500), cat: str('cat', 60), src, code: str('code', 40), quantity: str('quantity', 60),
+      n: Object.fromEntries(NK.map(k => [k, num(n0[k], k === 'kcal' ? 20000 : 5000, 'n.' + k)])) };
+    if (o.serving != null) {
+      const s = o.serving; if (typeof s !== 'object' || Array.isArray(s)) { if (strict) bad('serving must be an object'); f.serving = null; }
+      else { const g = num(s.g, 5000, 'serving.g'); if (!(g > 0)) { if (strict) bad('serving.g must be greater than 0'); f.serving = null; } else f.serving = { g, label: typeof s.label === 'string' ? s.label.slice(0, 100) : '' }; }
+    } else f.serving = null;
+    if (o.micro && typeof o.micro === 'object' && !Array.isArray(o.micro)) {
+      const mic = {}; for (const [k, v] of Object.entries(o.micro).slice(0, 40)) { if (/^[a-z0-9-]{1,40}$/.test(k) && typeof v === 'number' && Number.isFinite(v) && v >= 0) mic[k] = v; else if (strict) bad('micro.' + k + ' invalid'); }
+      if (Object.keys(mic).length) f.micro = mic;
+    } else if (o.micro != null && strict) bad('micro must be an object');
+    if (o.ns != null) { if (typeof o.ns === 'string' && /^[a-e]$/.test(o.ns)) f.ns = o.ns; else if (strict) bad('ns must be a-e'); }
+    if (o.nova != null) { if (Number.isInteger(o.nova) && o.nova >= 1 && o.nova <= 4) f.nova = o.nova; else if (strict) bad('nova must be 1-4'); }
+    if (o.rev != null && !(Number.isInteger(o.rev) && o.rev >= 1)) { if (strict) bad('rev must be a whole number >= 1'); }
+    f.rev = Number.isInteger(o.rev) && o.rev >= 1 ? o.rev : 1;
+    return f;
+  }
+
+  /** Strictly parse the app-data JSON of settings.md. Returns {foods, favs, tombs} or {error}. */
+  function readLibrary(data) {
+    const out = { foods: {}, favs: {}, tombs: { foods: {}, favs: {} } };
+    if (data == null) return out;
+    if (typeof data !== 'object' || Array.isArray(data)) return { error: 'app data must be an object' };
+    const parts = [['customFoods', 'foods'], ['favorites', 'favs']];
+    try {
+      for (const [key, dst] of parts) {
+        const arr = data[key]; if (arr == null) continue; if (!Array.isArray(arr)) throw new Error(key + ' must be a list');
+        arr.forEach((it, i) => { try { const f = cleanFood(it, true); if (out[dst][f.id]) throw new Error('duplicate id ' + f.id); out[dst][f.id] = f; } catch (e) { throw new Error(`${key}[${i}]: ${e.message}`); } });
+      }
+      if (data.deleted != null) {
+        if (typeof data.deleted !== 'object' || Array.isArray(data.deleted)) throw new Error('deleted must be an object');
+        for (const [key, dst] of parts) { const m = data.deleted[key]; if (m == null) continue; if (typeof m !== 'object' || Array.isArray(m)) throw new Error(`deleted.${key} must be an object`);
+          for (const [id, rev] of Object.entries(m)) { if (!LIB_ID.test(id) || !Number.isInteger(rev) || rev < 1) throw new Error(`deleted.${key}.${id} is invalid`); out.tombs[dst][id] = rev; } }
+      }
+    } catch (e) { return { error: e.message }; }
+    return out;
+  }
+
+  function mergeColl(Lraw, LT, R, RT, now) {
+    const L = {}; for (const [id, raw] of Object.entries(Lraw)) { try { L[id] = { raw, clean: cleanFood({ ...raw, id: raw.id || id }, false) }; } catch { /* cannot be synced: stays local, untouched */ } }
+    const newLocal = { ...Lraw }, file = {}, tombs = {}, ids = new Set([...Object.keys(L), ...Object.keys(R), ...Object.keys(LT), ...Object.keys(RT)]);
+    for (const id of ids) {
+      const l = L[id]?.clean, r = R[id], T = Math.max(LT[id]?.rev || 0, RT[id] || 0);
+      let from = null;
+      if (l && r) from = l.rev > r.rev ? 'l' : l.rev < r.rev ? 'r' : (libCanon(l) >= libCanon(r) ? 'l' : 'r'); else if (l) from = 'l'; else if (r) from = 'r';
+      const w = from === 'l' ? l : from === 'r' ? r : null;
+      if (w && w.rev > T) {
+        file[id] = w;
+        if (from === 'r') newLocal[id] = { ...r };
+        else if (L[id].raw.rev !== w.rev) L[id].raw.rev = w.rev;           // legacy items get a rev so later edits count
+      } else { tombs[id] = { rev: T, at: LT[id]?.at || now }; if (newLocal[id] && L[id]) delete newLocal[id]; else if (newLocal[id] && !L[id]) { /* unsyncable local item: keep */ } }
+    }
+    const sameKeys = (a, b) => { const ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every(k => k in b); };
+    const localChanged = !sameKeys(newLocal, Lraw) || Object.keys(newLocal).some(id => newLocal[id] !== Lraw[id]) || !sameKeys(tombs, LT) || Object.keys(tombs).some(id => tombs[id].rev !== LT[id].rev);
+    const remoteTombs = Object.fromEntries(Object.entries(tombs).map(([id, t]) => [id, t.rev]));
+    const remoteNeedsUpdate = !sameKeys(file, R) || Object.keys(file).some(id => stableJson(file[id]) !== stableJson(R[id])) || !sameKeys(remoteTombs, RT) || Object.keys(remoteTombs).some(id => remoteTombs[id] !== RT[id]);
+    return { local: newLocal, file, tombs, localChanged, remoteNeedsUpdate };
+  }
+
+  /** @param {object} p { local:{foods,favs}, localTombs:{foods,favs}, remote:{foods,favs,tombs} (from readLibrary), now } */
+  function mergeLibrary({ local, localTombs = {}, remote, now = Date.now() }) {
+    const a = mergeColl(local.foods || {}, localTombs.foods || {}, remote.foods, remote.tombs.foods, now);
+    const b = mergeColl(local.favs || {}, localTombs.favs || {}, remote.favs, remote.tombs.favs, now);
+    const list = m => Object.keys(m).sort().map(id => m[id]), revs = t => Object.fromEntries(Object.keys(t).sort().map(id => [id, t[id].rev]));
+    return { foods: a.local, favs: b.local, tombs: { foods: a.tombs, favs: b.tombs }, localChanged: a.localChanged || b.localChanged, remoteNeedsUpdate: a.remoteNeedsUpdate || b.remoteNeedsUpdate,
+      fileData: { customFoods: list(a.file), favorites: list(b.file), deleted: { customFoods: revs(a.tombs), favorites: revs(b.tombs) } } };
+  }
+  /** Fingerprint of the local library, to tell whether anything changed since the last sync. */
+  function libSig({ foods = {}, favs = {}, tombs = {} }) {
+    const part = m => Object.keys(m).sort().map(id => { try { const c = cleanFood({ ...m[id], id: m[id].id || id }, false); return [id, c.rev, libCanon(c)]; } catch { return [id, 0, '']; } });
+    const tb = t => Object.keys(t || {}).sort().map(id => [id, t[id].rev]);
+    return stableJson({ f: part(foods), v: part(favs), tf: tb(tombs.foods), tv: tb(tombs.favs) });
+  }
+
+  root.DayMerge = { mergeDay, makeBase, unionModels, canon, keyOf, cleanFood, readLibrary, mergeLibrary, libSig };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

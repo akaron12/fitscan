@@ -14,7 +14,7 @@ const SyncApp = (() => {
     if (!DriveAuth.getToken()) { paint(); return null; }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) { paint(); return null; }
     const r = await engine.syncNow({ visibleDate: ui.date });
-    if (r?.pulled && !sheetOpen()) rerender();
+    if ((r?.pulled || /pulled|merged/.test(r?.library || '')) && !sheetOpen()) rerender();
     paint(); refreshCard();
     return r;
   }

@@ -114,5 +114,58 @@ u = unionModels([model(fe({ id: 'a1', status: 'eaten', rev: 3 })), model(fe({ id
 u = unionModels([model(fe({ id: 'a1' })), model(fe())], uid); eq(DayFile.parse.entries(u).length, 1, 'id-less twin is not duplicated');
 u = unionModels([model(fe({ id: 'a1' })), model({ id: 'a1', meal: 'lunch', status: 'eaten', deleted: true, rev: 5 })], uid); eq(DayFile.parse.entries(u)[0].deleted, true, 'newer tombstone wins in a union');
 
+// ================= library (custom foods + favorites) =================
+const food = (id, o = {}) => ({ id, src: 'custom', name: id, brand: '', cat: 'Eigene', code: '', img: '', quantity: '', n: { kcal: 100, p: 1, c: 2, f: 3, fib: 0, sug: 0, salt: 0 }, serving: null, rev: 1, ...o });
+const mapOf = list => Object.fromEntries(list.map(f => [f.id, f]));
+const L0 = { foods: {}, favs: {} }, R0 = { foods: {}, favs: {}, tombs: { foods: {}, favs: {} } };
+const rlib = (foods = [], favs = [], tf = {}, tv = {}) => ({ foods: mapOf(foods.map(f => DayMerge.cleanFood(f))), favs: mapOf(favs.map(f => DayMerge.cleanFood(f))), tombs: { foods: tf, favs: tv } });
+const mlib = (local, localTombs, remote) => DayMerge.mergeLibrary({ local, localTombs, remote, now: 1000 });
+
+let lm = mlib(L0, {}, R0); eq([lm.localChanged, lm.remoteNeedsUpdate], [false, false], 'library: empty + empty');
+// local only => pushed; remote only => adopted
+lm = mlib({ foods: { a: food('a') }, favs: {} }, {}, R0); eq([lm.localChanged, lm.remoteNeedsUpdate, lm.fileData.customFoods.map(f => f.id)], [false, true, ['a']], 'library: local-only item is pushed');
+lm = mlib(L0, {}, rlib([food('r', { name: 'Remote food' })])); eq([lm.localChanged, lm.remoteNeedsUpdate, lm.foods.r.name], [true, false, 'Remote food'], 'library: remote-only item is adopted');
+// higher rev wins in both directions
+lm = mlib({ foods: { a: food('a', { name: 'new', rev: 2 }) }, favs: {} }, {}, rlib([food('a', { name: 'old', rev: 1 })])); eq([lm.foods.a.name, lm.localChanged, lm.remoteNeedsUpdate], ['new', false, true], 'library: higher local rev wins and is pushed');
+lm = mlib({ foods: { a: food('a', { name: 'old', rev: 1 }) }, favs: {} }, {}, rlib([food('a', { name: 'new', rev: 3 })])); eq([lm.foods.a.name, lm.foods.a.rev, lm.localChanged, lm.remoteNeedsUpdate], ['new', 3, true, false], 'library: higher remote rev wins and is adopted');
+// equal rev, different content: both devices pick the same winner (they converge)
+const A = food('a', { name: 'alpha', rev: 2 }), B = food('a', { name: 'beta', rev: 2 });
+const atA = mlib({ foods: { a: { ...A } }, favs: {} }, {}, rlib([B])), atB = mlib({ foods: { a: { ...B } }, favs: {} }, {}, rlib([A]));
+eq(atA.foods.a.name, atB.foods.a.name, 'library: a tie is decided the same way on both devices'); eq(atA.fileData.customFoods[0].name, atB.fileData.customFoods[0].name, 'library: and in the file');
+lm = mlib({ foods: { a: { ...A } }, favs: {} }, {}, rlib([A])); eq([lm.localChanged, lm.remoteNeedsUpdate], [false, false], 'library: identical items => idle');
+// deletes
+lm = mlib(L0, { foods: { a: { rev: 2, at: 5 } }, favs: {} }, rlib([food('a', { rev: 1 })])); eq([Object.keys(lm.foods), lm.remoteNeedsUpdate, lm.fileData.customFoods.length, lm.fileData.deleted.customFoods], [[], true, 0, { a: 2 }], 'library: local delete reaches Drive as a tombstone');
+lm = mlib({ foods: { a: food('a', { rev: 1 }) }, favs: {} }, {}, rlib([], [], { a: 2 })); eq([Object.keys(lm.foods), lm.tombs.foods.a.rev, lm.localChanged], [[], 2, true], 'library: remote tombstone deletes the local item');
+lm = mlib({ foods: { a: food('a', { rev: 3 }) }, favs: {} }, {}, rlib([], [], { a: 2 })); eq([Object.keys(lm.foods), Object.keys(lm.tombs.foods), lm.remoteNeedsUpdate], [['a'], [], true], 'library: an edit newer than the tombstone brings the item back');
+lm = mlib({ foods: { a: food('a', { rev: 2 }) }, favs: {} }, {}, rlib([], [], { a: 2 })); eq(Object.keys(lm.foods), [], 'library: equal rev => the deletion wins');
+lm = mlib(L0, {}, rlib([food('a', { rev: 1 })], [], { a: 5 })); eq([Object.keys(lm.foods), lm.tombs.foods.a.rev], [[], 5], 'library: an old remote item behind a newer tombstone is not resurrected');
+// favorites are their own collection
+lm = mlib({ foods: { a: food('a') }, favs: { a: food('a', { src: 'off' }) } }, {}, rlib([food('a')], [])); eq([lm.fileData.favorites.map(f => f.id), lm.fileData.customFoods.map(f => f.id), lm.remoteNeedsUpdate], [['a'], ['a'], true], 'library: favorites pushed separately from foods (the food was already remote, the favorite was not)');
+lm = mlib(L0, {}, rlib([], [food('o:1', { src: 'off', name: 'Oats' })])); eq([lm.favs['o:1'].name, lm.favs['o:1'].src], ['Oats', 'off'], 'library: remote favorite adopted');
+// legacy local items (no rev) get one; items that cannot be synced stay untouched and out of the file
+const legacy = food('l'); delete legacy.rev; lm = mlib({ foods: { l: legacy }, favs: {} }, {}, R0); eq([legacy.rev, lm.fileData.customFoods[0].rev], [1, 1], 'library: legacy item gets rev 1');
+const broken = { id: 'b', n: {} }; lm = mlib({ foods: { b: broken, g: food('g') }, favs: {} }, {}, R0); eq([lm.foods.b === broken, lm.fileData.customFoods.map(f => f.id)], [true, ['g']], 'library: an item without a name is neither synced nor deleted');
+// two devices converge
+const devA = { foods: { x: food('x', { name: 'only-A' }) }, favs: {} }, devB = { foods: { y: food('y', { name: 'only-B' }) }, favs: {} };
+const fromA = mlib(devA, {}, R0);                                                         // A syncs first: file now has x
+const fromB = mlib(devB, {}, rlib(fromA.fileData.customFoods));                           // B pulls x, pushes y
+const fromA2 = mlib({ foods: fromA.foods, favs: {} }, {}, rlib(fromB.fileData.customFoods));   // A pulls y
+eq([Object.keys(fromB.foods).sort(), Object.keys(fromA2.foods).sort(), fromA2.remoteNeedsUpdate], [['x', 'y'], ['x', 'y'], false], 'library: two devices converge on the union');
+
+// ---- reading the file (strict) ----
+const okData = { customFoods: [food('a')], favorites: [food('o:1', { src: 'off' })], deleted: { customFoods: { z: 3 }, favorites: {} } };
+let rl = DayMerge.readLibrary(okData); eq([Object.keys(rl.foods), Object.keys(rl.favs), rl.tombs.foods], [['a'], ['o:1'], { z: 3 }], 'readLibrary: valid data'); eq(Object.keys(DayMerge.readLibrary(null).foods), [], 'readLibrary: null is an empty library');
+const bads = { 'item without name': { customFoods: [{ id: 'a', n: { kcal: 1 } }] }, 'id with spaces': { customFoods: [food('a b')] }, 'markup in id': { customFoods: [food('<img src=x>')] }, 'nutrition missing': { customFoods: [{ id: 'a', name: 'A' }] },
+  'text instead of number': { customFoods: [food('a', { n: { kcal: 'lots' } })] }, 'duplicate ids': { customFoods: [food('a'), food('a')] }, 'list expected': { customFoods: 'x' }, 'bad tombstone': { deleted: { customFoods: { a: 'x' } } },
+  'tombstone id with markup': { deleted: { customFoods: { '<b>': 2 } } }, 'array root': [], 'bad rev': { customFoods: [food('a', { rev: 0 })] }, 'bad serving': { customFoods: [food('a', { serving: { g: 0 } })] }, 'bad nova': { customFoods: [food('a', { nova: 9 })] }, 'bad nutriscore': { customFoods: [food('a', { ns: 'constructor' })] }, 'bad src': { customFoods: [food('a', { src: '<x>' })] } };
+for (const [name, data] of Object.entries(bads)) ok(DayMerge.readLibrary(data).error, 'readLibrary rejects: ' + name);
+// lenient cleaning of local data / hostile extras
+const dirty = DayMerge.cleanFood({ id: 'h', name: '<img src=x onerror=alert(1)>', img: 'x'.repeat(900), evil: 'dropped', src: 'Evil<', n: { kcal: 'NaN', p: 5 }, serving: { g: -4 }, micro: { sodium: 3, '__proto__': 1, 'bad key!': 2 }, ns: 'z', nova: 12 }, false);
+eq([dirty.name, dirty.img.length, 'evil' in dirty, dirty.src, dirty.n.kcal, dirty.n.p, dirty.serving, dirty.micro, 'ns' in dirty, 'nova' in dirty], ['<img src=x onerror=alert(1)>', 500, false, 'custom', 0, 5, null, { sodium: 3 }, false, false], 'cleanFood drops unknown keys, truncates, coerces and ignores bad extras');
+// fingerprint
+const s1 = DayMerge.libSig({ foods: { a: food('a') }, favs: {}, tombs: {} }); eq(s1, DayMerge.libSig({ foods: { a: food('a') }, favs: {}, tombs: {} }), 'libSig is stable');
+ok(s1 !== DayMerge.libSig({ foods: { a: food('a', { name: 'x' }) }, favs: {}, tombs: {} }), 'libSig sees an edit'); ok(s1 !== DayMerge.libSig({ foods: { a: food('a') }, favs: {}, tombs: { foods: { z: { rev: 2 } } } }), 'libSig sees a deletion');
+eq(DayMerge.libSig({ foods: { a: food('a', { rev: 1 }) }, favs: {}, tombs: {} }), DayMerge.libSig({ foods: { a: { ...food('a'), extraLocalField: 1, hasNutr: true } }, favs: {}, tombs: {} }), 'libSig ignores fields that never sync');
+
 print(`\n${passed} passed, ${failed} failed`);
 if (failed) throw new Error(failed + ' check(s) failed');

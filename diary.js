@@ -102,7 +102,7 @@ function bindMacroKcal(sh, n = {}, hasEntry = false) {
 function quickToCustomFood(name, kcal, p, c, f) {
   const G = Math.max(100, Math.ceil(Math.max(kcal / 9, p + c + f) / 10) * 10), k = 100 / G, id = 'cust:' + uid();   // portion weight keeps per-100 g values plausible
   const food = { id, src: 'custom', code: '', name, brand: '', cat: 'Eigene', n: { kcal: r1(kcal * k), p: r1(p * k), c: r1(c * k), f: r1(f * k), sug: 0, fib: 0, salt: 0 }, serving: { g: G, label: 'Portion' } };
-  S.foods[id] = food; return { food, g: G };
+  saveCustomFood(food); return { food, g: G };
 }
 function quickAddSheet(meal, entry = null) {
   meal = entry?.meal || meal || ui.targetMeal || mealDefault();

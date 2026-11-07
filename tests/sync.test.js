@@ -9,7 +9,7 @@ const WRITE = c => (c.method === 'POST' || c.method === 'PATCH') && c.path.start
 const fe = (o = {}) => ({ meal: 'lunch', status: 'planned', food: 'Rice', qty_g: 100, kcal: 130, p: 3, c: 28, f: 0.3, ...o });
 
 function device(d, { name = 'dev', spec = null } = {}) {
-  const S = { entries: {}, tombstones: {}, goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false } };
+  const S = { entries: {}, tombstones: {}, goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false }, foods: {}, favorites: {}, libTombs: { foods: {}, favs: {} } };
   let k = 0; const dev = { S, persists: 0, token: null, uid: () => name + (++k) };   // dev.token overrides the token this device sends (to simulate expiry)
   const drive = DriveClient.create({ fetch: d.fetch, getToken: () => dev.token || d.token, sleep: async () => {}, store: DriveClient.memStore() }); dev.drive = drive;
   dev.eng = Sync.create({ drive, getS: () => S, persist: () => { dev.persists++; }, uid: dev.uid, today: () => TODAY, specText: spec });
@@ -147,6 +147,72 @@ test('overlapping syncNow calls collapse into at most one follow-up run', async 
 });
 test('status listeners are notified', async () => {
   const d = setup(), a = device(d), seen = []; a.eng.onStatus(s => seen.push(s.state)); await a.eng.syncNow(); ok(seen.includes('syncing') && seen.at(-1) === 'idle', 'syncing then idle');
+});
+
+// ---------- custom foods + favorites (settings.md) ----------
+const settingsFile = d => [...d.files.values()].find(f => f.name === 'settings.md' && !f.trashed);
+const settingsData = d => Sync.parseSettings(settingsFile(d).content).data;
+const mkFood = (id, o = {}) => ({ id, src: 'custom', name: id, brand: '', cat: 'Eigene', code: '', n: { kcal: 100, p: 1, c: 2, f: 3, fib: 0, sug: 0, salt: 0 }, serving: null, rev: 1, ...o });
+/** what core.js does when a food is saved / deleted / favorited */
+const addFood = (dev, id, o = {}) => { const old = dev.S.foods[id]; dev.S.foods[id] = mkFood(id, { ...o, rev: (old?.rev || 0) + 1 }); delete dev.S.libTombs.foods[id]; };
+const delFood = (dev, id) => { const old = dev.S.foods[id]; dev.S.libTombs.foods[id] = { rev: old.rev + 1, at: 1 }; delete dev.S.foods[id]; };
+const addFav = (dev, id, o = {}) => { const old = dev.S.favorites[id]; dev.S.favorites[id] = mkFood(id, { src: 'off', ...o, rev: (old?.rev || 0) + 1 }); delete dev.S.libTombs.favs[id]; };
+const delFav = (dev, id) => { const old = dev.S.favorites[id]; dev.S.libTombs.favs[id] = { rev: old.rev + 1, at: 1 }; delete dev.S.favorites[id]; };
+
+test('library: foods and favorites travel between two devices (add, edit, delete)', async () => {
+  const d = setup(), a = device(d, { name: 'A' }), b = device(d, { name: 'B' });
+  addFood(a, 'cust:bowl', { name: 'Bowl' }); addFav(a, 'off:123', { name: 'Oats' }); eq(a.eng.status().pending, 1, 'a waiting settings change is counted');
+  await a.eng.syncNow(); eq(a.eng.status().pending, 0, 'pushed'); const dta = settingsData(d); eq([dta.customFoods.map(f => f.id), dta.favorites.map(f => f.id)], [['cust:bowl'], ['off:123']], 'both in settings.md');
+  const r = await b.eng.syncNow(); eq([Object.keys(b.S.foods), Object.keys(b.S.favorites), r.library], [['cust:bowl'], ['off:123'], 'pulled'], 'B received them'); eq(b.eng.status().pending, 0, 'B has nothing waiting');
+  addFood(b, 'cust:bowl', { name: 'Bowl XL' }); await b.eng.syncNow(); await a.eng.syncNow(); eq(a.S.foods['cust:bowl'].name, 'Bowl XL', 'A got the edit'); eq(a.S.foods['cust:bowl'].rev, 2, 'with its rev');
+  delFood(a, 'cust:bowl'); delFav(a, 'off:123'); await a.eng.syncNow(); const dd = settingsData(d); eq([dd.customFoods.length, dd.favorites.length, dd.deleted.customFoods['cust:bowl'], dd.deleted.favorites['off:123']], [0, 0, 3, 2], 'tombstones in the file');
+  await b.eng.syncNow(); eq([Object.keys(b.S.foods), Object.keys(b.S.favorites), Object.keys(b.S.libTombs.foods)], [[], [], ['cust:bowl']], 'B applied the deletions');
+  const w = d.count(WRITE); await a.eng.syncNow(); await b.eng.syncNow(); eq(d.count(WRITE), w, 'settled: no more writes');
+});
+test('library: an edit made after another device deleted the food brings it back', async () => {
+  const d = setup(), a = device(d, { name: 'A' }), b = device(d, { name: 'B' }); addFood(a, 'cust:x', { name: 'X' }); await a.eng.syncNow(); await b.eng.syncNow();
+  delFood(a, 'cust:x'); await a.eng.syncNow();                                        // tombstone rev 2
+  addFood(b, 'cust:x', { name: 'X edited' }); addFood(b, 'cust:x', { name: 'X edited twice' });   // B (offline) edits twice: rev 3
+  await b.eng.syncNow(); eq(b.S.foods['cust:x'].name, 'X edited twice', 'B keeps its newer edit'); await a.eng.syncNow(); eq(a.S.foods['cust:x']?.name, 'X edited twice', 'and A gets the food back');
+});
+test('library: first sync on a fresh device pulls the library and writes nothing', async () => {
+  const d = setup(), a = device(d, { name: 'A' }); addFood(a, 'cust:1'); addFav(a, 'off:9'); await a.eng.syncNow(); const w = d.count(WRITE);
+  const b = device(d, { name: 'fresh' }); await b.eng.syncNow(); eq(d.count(WRITE), w, 'hydrate wrote nothing'); eq([Object.keys(b.S.foods), Object.keys(b.S.favorites)], [['cust:1'], ['off:9']], 'library restored');
+});
+test('library: goals-only file stays free of an app-data block; foods added later extend it; text around the blocks is kept', async () => {
+  const d = setup(), a = device(d); a.S.goals = { kcal: 2400, p: 160, c: 250, f: 80, manual: true, rev: 1 }; await a.eng.syncNow(); ok(!/```json/.test(settingsFile(d).content), 'no json block without a library');
+  const f = settingsFile(d); f.content = f.content.replace('# Meal Tracker settings', '# My own heading\nHand-written note.'); f.modifiedTime = '2031-01-01T00:00:00.000Z';
+  addFood(a, 'cust:y', { name: 'Y' }); await a.eng.syncNow(); const c = settingsFile(d).content; ok(/```json/.test(c) && c.includes('"cust:y"'), 'json block added'); ok(c.includes('Hand-written note.') && c.includes('# My own heading') && /kcal: 2400/.test(c), 'goals and hand-written text survive');
+  ok(c.includes('## Custom foods and favorites'), 'a heading explains the block');
+});
+test('library: an unreadable app-data block is never overwritten (goals still sync, days still sync, user is told)', async () => {
+  const d = setup(), a = device(d); a.S.goals = { kcal: 2400, p: 160, c: 250, f: 80, manual: true, rev: 1 }; addFood(a, 'cust:z', { name: 'Z' }); await a.eng.syncNow();
+  const f = settingsFile(d); f.content = f.content.replace(/```json[\s\S]*?```/, '```json\n{ "customFoods": [ { "id": "ok", "name": "Hand edit", "n": { "kcal": "lots" } } ] }\n```'); f.modifiedTime = '2031-01-01T00:00:00.000Z'; const broken = f.content.match(/```json[\s\S]*?```/)[0];
+  a.S.goals = { ...a.S.goals, kcal: 2500, rev: 2 }; addFood(a, 'cust:w', { name: 'W' }); eat(a, TODAY, { food: 'Day entry' }); const r = await a.eng.syncNow();
+  ok(r.ok, 'sync completes'); eq(r.library, 'unreadable', 'reported unreadable'); ok(settingsFile(d).content.includes(broken), 'the unreadable block is byte-for-byte intact'); ok(/kcal: 2500/.test(settingsFile(d).content), 'goals were still written');
+  ok(a.eng.status().blocked['settings.md'] && a.eng.status().warnings.some(w => /not synced/.test(w)), 'user is told'); eq(remoteEntries(d, TODAY).length, 1, 'days sync normally'); eq(a.eng.status().pending, 0, 'blocked library is not counted as waiting');
+  eq(Object.keys(a.S.foods).sort(), ['cust:w', 'cust:z'], 'local foods untouched');
+});
+test('library: hostile items in the file block the library instead of entering the app', async () => {
+  const d = setup(), a = device(d); await a.eng.syncNow(); const mt = mealFolder(d).id;
+  d.add('settings.md', { parents: [mt], content: '---\nformat: meal-settings/1\n---\n```json\n{ "customFoods": [ { "id": "<img src=x onerror=alert(1)>", "name": "Evil", "n": { "kcal": 1 } } ] }\n```\n' });
+  const r = await a.eng.syncNow(); eq([r.library, Object.keys(a.S.foods)], ['unreadable', []], 'rejected as a whole');
+  const hostile = '```json\n{ "customFoods": [ { "id": "ok1", "name": "<script>alert(1)</script>", "img": "javascript:alert(1)", "evil": "dropped", "n": { "kcal": 50, "p": 1 } } ] }\n```'; const f = settingsFile(d); f.content = '---\nformat: meal-settings/1\n---\n' + hostile + '\n'; f.modifiedTime = '2032-01-01T00:00:00.000Z';
+  await a.eng.syncNow(); const got = a.S.foods.ok1; eq([got.name, 'evil' in got, got.rev], ['<script>alert(1)</script>', false, 1], 'text stays text, unknown keys are dropped');
+});
+test('library: a write that races with another writer is retried and both changes survive', async () => {
+  const d = setup(), a = device(d, { name: 'A' }), b = device(d, { name: 'B' }); addFood(a, 'cust:a1'); await a.eng.syncNow(); await b.eng.syncNow();
+  addFood(a, 'cust:a2'); let injected = false;
+  d.beforeRequest = async ({ method, path, query }) => { if (!injected && method === 'GET' && path.startsWith('/drive/v3/files/') && /fields=/.test(query) && !/alt=media/.test(query)) { const f = settingsFile(d); if (f) { injected = true; const data = Sync.parseSettings(f.content).data; data.favorites.push(mkFood('off:from-b', { src: 'off', rev: 1 })); f.content = Sync.serializeSettings(Sync.parseSettings(f.content), null, data).replace(/^/, ''); f.modifiedTime = '2030-01-01T00:00:00.000Z'; } } };
+  const r = await a.eng.syncNow(); d.beforeRequest = null; ok(r.ok && injected, 'ok after retry'); const dta = settingsData(d); eq([dta.customFoods.map(f => f.id), dta.favorites.map(f => f.id)], [['cust:a1', 'cust:a2'], ['off:from-b']], 'both changes in the file'); ok('off:from-b' in a.S.favorites, 'and on the device');
+});
+test('library: parse/serialize keep unknown top-level keys and intro text', async () => {
+  const t = '---\nformat: meal-settings/1\n---\nIntro\n\n```yaml\nextra: keepme\ngoals:\n  kcal: 2000\n  p: 100\n  c: 200\n  f: 60\n  rev: 2\n```\nBetween\n```json\n{ "customFoods": [], "favorites": [], "deleted": {}, "note": { "k": 1 } }\n```\nTail\n';
+  const m = Sync.parseSettings(t); eq([m.goals.kcal, m.hasData, m.dataError], [2000, true, null], 'parsed');
+  const out = Sync.serializeSettings(m, { kcal: 2100, p: 100, c: 200, f: 60, rev: 3 }, { customFoods: [mkFood('c1')], favorites: [], deleted: { customFoods: {}, favorites: {} } });
+  ok(out.includes('Intro') && out.includes('Between') && out.includes('Tail') && out.includes('extra: keepme') && out.includes('kcal: 2100') && out.includes('"note": {"k":1}') && out.includes('"c1"'), 'content around and unknown keys kept');
+  const re = Sync.parseSettings(out); eq([re.data.customFoods.length, re.data.note, re.goals.rev], [1, { k: 1 }, 3], 'round trip');
+  eq(Sync.serializeSettings(Sync.parseSettings(t), { kcal: 2000, p: 100, c: 200, f: 60, rev: 2 }, undefined).includes('"note": { "k": 1 }'), true, 'with data undefined the json block is copied untouched');
 });
 
 let done = false, summary = '';

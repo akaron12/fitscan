@@ -10,7 +10,7 @@ Goals: calories + macros, barcode (Open Food Facts), USDA FoodData Central searc
 Non-goals: weight/body tracking, water, fasting, adaptive TDEE, onboarding/profile, backend server.
 
 ## FitScan: keep / remove / add
-- Keep: diary UI and flow, barcode scanning (BarcodeDetector + ZXing), OFF search, 500+ built-in foods, custom foods, recipes, favorites, recents, Nutri-Score, NOVA, micronutrients, DE/EN UI (assumed), light/dark.
+- Keep: diary UI and flow, barcode scanning (BarcodeDetector + ZXing), OFF search, 500+ built-in foods, custom foods, recipes, favorites, recents, Nutri-Score, NOVA, micronutrients, English-only UI (D23), light/dark.
 - Remove: weight, measurements, weight charts, water, fasting, onboarding, profile, weekly check-in. Charts keep calories/macros only.
 - Add: USDA search, live quick-entry kcal (4/4/9) with override + save as custom food, manual goals screen, Drive sync, planned/eaten status, offline barcode queue.
 
@@ -91,6 +91,7 @@ GitHub Action stamps service-worker cache version from commit; "update available
 | D20 | SW/format versioning | Auto cache version, update prompt, refuse newer format | Stale clients | Red Team | 2026-11-06 |
 | D21 | Extra fields | Passthrough + optional schema keys | Round-trip safety | Red Team | 2026-11-06 |
 | D22 | Minor risks | Rolling window + 60d tombstones; local dates; attribution/backoff | Defaults adopted | Red Team | 2026-11-06 |
+| D23 | Language | English only: no language switch, English formats, built-in foods and serving names renamed to English, Open Food Facts search no longer tuned for Germany. German strings stay in the code as internal lookup keys | User asked to remove German (replaces the earlier assumption to keep DE/EN) | Interview | 2026-11-07 |
 
 ## Dependency Graph & Implementation Order
 1. Fork, strip removed features, rename (no deps).

@@ -10,11 +10,13 @@ This folder (`AI Memory/Meal Tracker/`) is shared between the Meal Tracker app a
 | File | Purpose | Who writes |
 |---|---|---|
 | `YYYY-MM-DD.md` | One day (the device's local calendar date) | app and Claude |
-| `settings.md` | Daily goals, favorites, custom foods | **app only**. Claude reads it, never edits it |
+| `settings.md` | Daily goals, custom foods, favorites | **app only**. Claude reads it, never edits it |
 | `FORMAT.md` | This spec | app |
 
-## Daily goals (read these before planning)
-`settings.md` contains a ```` ```yaml ```` block with `goals:` (`kcal`, `p`, `c`, `f`, in kcal and grams per day). Plan against those numbers.
+## settings.md: goals and favorite foods (read these before planning, never edit them)
+- **Goals:** a ```` ```yaml ```` block with `goals:` (`kcal`, `p`, `c`, `f`, in kcal and grams per day). Plan against those numbers.
+- **Foods you can plan with:** a ```` ```json ```` block ("app data") lists the user's `customFoods` (their own recipes and products) and `favorites` (foods they starred). Each item has a `name` and `n`, the nutrition **per 100 g** (`kcal`, `p`, `c`, `f`, and sometimes `fib`, `sug`, `salt`), plus an optional `serving` (`g` = grams in one portion). Prefer these foods when planning, and scale `qty_g`, `kcal`, `p`, `c`, `f` for the planned amount: for 150 g of a food with `kcal: 165` per 100 g, write `kcal: 248`.
+- Ignore `rev` and the `deleted` list: they are bookkeeping for the app. If you edit this file, the app may overwrite or reject your change, so do not.
 
 ## Day file layout
 ````markdown

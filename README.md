@@ -13,8 +13,8 @@ A lightweight personal meal tracker (installable PWA): calories and macros, barc
 - **Daily goals:** set kcal and macros; the diary shows what is left through the day.
 - **Works offline:** everything you logged stays searchable; an unknown barcode scanned offline becomes a placeholder row that is looked up automatically when you are back online.
 - **Planned meals:** Claude (in other chats) writes planned meals into a day's file in Drive; they show dimmed in the diary with a projected total, and one tap marks one as eaten. See [`docs/FORMAT.md`](docs/FORMAT.md) for the strict file format.
-- **Google Drive sync (optional):** one markdown file per day plus a settings file with your goals, in `AI Memory/Meal Tracker/`. Local storage stays the source; edits are merged entry by entry and never silently overwritten (an entry you marked eaten is protected from outside edits; anything blocked is listed as a suggestion).
-- **Also:** Nutri-Score and NOVA badges, micronutrients, weekly insights and calorie/macro charts, JSON backup and CSV export, German and English UI, light/dark mode.
+- **Google Drive sync (optional):** one markdown file per day plus a settings file with your goals, custom foods and favorites, in `AI Memory/Meal Tracker/`. Local storage stays the source; edits are merged entry by entry and never silently overwritten (an entry you marked eaten is protected from outside edits; anything blocked is listed as a suggestion).
+- **Also:** Nutri-Score and NOVA badges, micronutrients, weekly insights and calorie/macro charts, JSON backup and CSV export, light/dark mode. English only.
 
 Removed from FitScan: weight and body tracking, water, fasting, onboarding and the weekly check-in.
 

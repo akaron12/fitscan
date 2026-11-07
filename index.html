@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de" data-theme="light">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <!-- Content-Security-Policy. GitHub Pages cannot send headers, so this is a meta tag (frame-ancestors is not available that way).
@@ -21,17 +21,17 @@
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="grow"><p id="pageSub" class="eyebrow hidden"></p><h1 id="pageTitle">Tagebuch</h1></div>
+    <div class="grow"><p id="pageSub" class="eyebrow hidden"></p><h1 id="pageTitle">Diary</h1></div>
     <div id="topActions"></div>
     <button id="syncPill" class="sync-pill" type="button" aria-live="polite"></button>
   </header>
   <main id="view"></main>
   <nav class="tabbar">
-    <button data-tab="diary" class="active"><span data-ic="book"></span><span data-t="Tagebuch">Tagebuch</span></button>
-    <button data-tab="library"><span data-ic="search"></span><span data-t="Lebensmittel">Lebensmittel</span></button>
-    <button data-tab="scan" class="scan-tab" data-tl="Scannen" aria-label="Scannen"><span class="scan-btn" data-ic="scan"></span></button>
-    <button data-tab="progress"><span data-ic="chart"></span><span data-t="Fortschritt">Fortschritt</span></button>
-    <button data-tab="profile"><span data-ic="settings"></span><span data-t="Einstellungen">Einstellungen</span></button>
+    <button data-tab="diary" class="active"><span data-ic="book"></span><span data-t="Tagebuch">Diary</span></button>
+    <button data-tab="library"><span data-ic="search"></span><span data-t="Lebensmittel">Foods</span></button>
+    <button data-tab="scan" class="scan-tab" data-tl="Scannen" aria-label="Scan"><span class="scan-btn" data-ic="scan"></span></button>
+    <button data-tab="progress"><span data-ic="chart"></span><span data-t="Fortschritt">Progress</span></button>
+    <button data-tab="profile"><span data-ic="settings"></span><span data-t="Einstellungen">Settings</span></button>
   </nav>
 </div>
 <div id="sheetBackdrop" class="backdrop hidden"></div>
@@ -44,8 +44,8 @@
   <div class="scan-bottom">
     <button class="glass-pill" id="scanMode"><span data-ic="repeat"></span><span id="scanModeL"></span></button>
     <div class="scan-actions">
-      <button class="glass-pill" id="scanManual"><span data-ic="keyboard"></span><span data-t="Nummer eingeben">Nummer eingeben</span></button>
-      <label class="glass-pill"><span data-ic="image"></span><span data-t="Foto">Foto</span><input type="file" accept="image/*" id="scanFile" hidden></label>
+      <button class="glass-pill" id="scanManual"><span data-ic="keyboard"></span><span data-t="Nummer eingeben">Enter number</span></button>
+      <label class="glass-pill"><span data-ic="image"></span><span data-t="Foto">Photo</span><input type="file" accept="image/*" id="scanFile" hidden></label>
     </div>
   </div>
 </div>

@@ -25,9 +25,9 @@ const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 const mealName = id => t(MEALS.find(m => m[0] === id)?.[1] || 'Snacks');
 
 // ---------- State ----------
-const DEFAULT = () => ({ goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false }, entries: {}, tombstones: {},
+const DEFAULT = () => ({ goals: { kcal: 2200, p: 140, c: 240, f: 75, manual: false }, entries: {}, tombstones: {}, libTombs: { foods: {}, favs: {} },
   foods: {}, products: {}, recipes: {}, recents: [], favorites: {}, scanHistory: [],
-  settings: { theme: 'light', lang: null } });
+  settings: { theme: 'light' } });
 // Data removed from the app (weight, water, fasting, profile, check-ins) is dropped on load.
 const STATUSES = ['planned', 'eaten'], TOMBSTONE_TTL_DAYS = 60;
 const REMOVED_KEYS = ['profile', 'weights', 'water', 'measures', 'checkins', 'fast', 'fastLog'];
@@ -56,6 +56,12 @@ function sanitize(o) {
   // Tombstones (deleted entry ids per day) let a later sync tell "deleted" from "never seen". They expire after 60 days.
   if (!isObj(s.tombstones)) s.tombstones = {};
   const cutoff = Date.now() - TOMBSTONE_TTL_DAYS * 864e5;
+  // Same for deleted custom foods / favorites: s.libTombs = { foods: {id: {rev, at}}, favs: {...} }
+  if (!isObj(s.libTombs)) s.libTombs = {};
+  for (const k of ['foods', 'favs']) {
+    if (!isObj(s.libTombs[k])) s.libTombs[k] = {};
+    for (const [id, tb] of Object.entries(s.libTombs[k])) if (!isObj(tb) || !(+tb.rev >= 1) || !(+tb.at > cutoff)) delete s.libTombs[k][id];
+  }
   for (const [dk, m] of Object.entries(s.tombstones)) {
     if (!isObj(m)) { delete s.tombstones[dk]; continue; }
     for (const [id, tb] of Object.entries(m)) if (!isObj(tb) || !(+tb.at > cutoff)) delete m[id];
@@ -63,7 +69,7 @@ function sanitize(o) {
   }
   s.recents = s.recents.filter(f => isObj(f) && isObj(f.n));
   const st = s.settings;
-  for (const k of ['waterGoal', 'glass', 'fastTarget', 'showWater', 'showFasting', 'onboarded', 'planStart']) delete st[k];
+  for (const k of ['waterGoal', 'glass', 'fastTarget', 'showWater', 'showFasting', 'onboarded', 'planStart', 'lang']) delete st[k];
   st.continuousScan ??= false; st.beep ??= true;
   // v6: new light design – earlier versions defaulted to dark, so switch everyone to light once.
   if (st.ui !== 6) { st.theme = 'light'; st.ui = 6; }
@@ -116,6 +122,27 @@ function restoreEntry(date, e, i = -1) {
   if (S.tombstones[date]) { delete S.tombstones[date][e.id]; if (!Object.keys(S.tombstones[date]).length) delete S.tombstones[date]; }
   touch(e); const arr = (S.entries[date] ||= []); arr.splice(i < 0 ? arr.length : i, 0, e);
 }
+// ---------- Library (custom foods + favorites): revisions and tombstones so Drive sync can merge item by item ----------
+const libRev = (obj, tomb) => Math.max(obj?.rev || 0, tomb?.rev || 0) + 1;
+/** Add or update a favorite (a snapshot of the food). Its rev counts favorite changes only, not edits of the food itself. */
+function setFavorite(food) {
+  const tomb = S.libTombs.favs[food.id], rev = libRev(S.favorites[food.id], tomb);
+  delete S.libTombs.favs[food.id]; S.favorites[food.id] = { ...food, rev };
+}
+function removeFavorite(id) {
+  const old = S.favorites[id]; if (!old) return;
+  S.libTombs.favs[id] = { rev: (old.rev || 0) + 1, at: Date.now() }; delete S.favorites[id];
+}
+/** Create or update a custom food; keeps its favorite snapshot in step. */
+function saveCustomFood(food) {
+  const tomb = S.libTombs.foods[food.id]; food.rev = libRev(S.foods[food.id], tomb);
+  delete S.libTombs.foods[food.id]; S.foods[food.id] = food;
+  if (S.favorites[food.id]) setFavorite(food);
+}
+function deleteCustomFood(id) {
+  const old = S.foods[id]; if (old) S.libTombs.foods[id] = { rev: (old.rev || 0) + 1, at: Date.now() };
+  delete S.foods[id]; removeFavorite(id);
+}
 const defaultPortion = f => f.serving?.g ? { g: f.serving.g, label: `1 × ${f.serving.label}`, unit: 'serv', qty: 1 } : { g: 100, label: '100 g', unit: 'g', qty: 100 };
 // ---------- Weekly insights ----------
 function insights() {
@@ -130,12 +157,12 @@ const MICROS = [['saturated-fat', 'Gesättigte Fettsäuren', 'g', 1], ['sodium',
   ['magnesium', 'Magnesium', 'mg', 1000], ['iron', 'Eisen', 'mg', 1000], ['zinc', 'Zink', 'mg', 1000], ['vitamin-a', 'Vitamin A', 'µg', 1e6], ['vitamin-c', 'Vitamin C', 'mg', 1000], ['vitamin-d', 'Vitamin D', 'µg', 1e6],
   ['vitamin-e', 'Vitamin E', 'mg', 1000], ['vitamin-b12', 'Vitamin B12', 'µg', 1e6], ['vitamin-b6', 'Vitamin B6', 'mg', 1000], ['folates', 'Folat', 'µg', 1e6], ['caffeine', 'Koffein', 'mg', 1000]];
 const NS_COL = { a: '#038141', b: '#85bb2f', c: '#fecb02', d: '#ee8100', e: '#e63e11' };
-const OFF_FIELDS = 'code,product_name,product_name_de,generic_name_de,brands,image_front_small_url,image_front_url,nutriments,serving_size,serving_quantity,quantity,countries_tags,nutriscore_grade,nova_group,completeness';
+const OFF_FIELDS = 'code,product_name,product_name_en,generic_name_en,brands,image_front_small_url,image_front_url,nutriments,serving_size,serving_quantity,quantity,countries_tags,nutriscore_grade,nova_group,completeness';
 function parseOFF(p, code) {
   if (!p) return null;
   const nm = p.nutriments || {}, n = k => { const x = parseFloat(nm[k]); return isFinite(x) ? x : 0; };
   let kcal = n('energy-kcal_100g'); if (!kcal && n('energy_100g')) kcal = n('energy_100g') / 4.184;
-  const name = p.product_name_de || p.product_name || p.generic_name_de || 'Unbenanntes Produkt', sq = parseFloat(p.serving_quantity);
+  const name = p.product_name_en || p.product_name || p.generic_name_en || 'Unnamed product', sq = parseFloat(p.serving_quantity);
   const brand = Array.isArray(p.brands) ? p.brands.join(', ') : (p.brands || '');
   const f = { id: 'off:' + (p.code || code), src: 'off', code: p.code || code, name: name.trim(), brand: brand.split(',').slice(0, 2).join(', ').trim(), img: p.image_front_small_url || p.image_front_url || '',
     cat: '', quantity: p.quantity || '', n: { kcal: r1(kcal), p: n('proteins_100g'), c: n('carbohydrates_100g'), f: n('fat_100g'), sug: n('sugars_100g'), fib: n('fiber_100g'), salt: n('salt_100g') },
@@ -145,7 +172,6 @@ function parseOFF(p, code) {
   if (Object.keys(mic).length) f.micro = mic;
   if (/^[a-e]$/.test(p.nutriscore_grade || '')) f.ns = p.nutriscore_grade;
   if (p.nova_group) f.nova = +p.nova_group;
-  f.de = Array.isArray(p.countries_tags) && p.countries_tags.includes('en:germany');
   f.compl = +p.completeness || 0;
   return f;
 }
@@ -153,7 +179,7 @@ async function lookupBarcode(code) {
   code = String(code).replace(/\D/g, '');
   const custom = Object.values(S.foods).find(f => f.code === code); if (custom) return { product: custom, cached: true };
   if (S.products[code]) return { product: S.products[code], cached: true };
-  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=${OFF_FIELDS}&lc=de`, { headers: { Accept: 'application/json' } });
+  const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=${OFF_FIELDS}&lc=en`, { headers: { Accept: 'application/json' } });
   if (res.status === 404) return { product: null };
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const j = await res.json();
@@ -164,10 +190,10 @@ async function lookupBarcode(code) {
 const dedupe = arr => { const s = new Set(); return arr.filter(x => !s.has(x.id) && s.add(x.id)); };
 async function searchOFF(q, signal) {
   const qs = encodeURIComponent(q), F = `&fields=${OFF_FIELDS}`;
-  const sal = async extra => { const r = await fetch(`https://search.openfoodfacts.org/search?q=${qs}${extra}&langs=de,en&page_size=30${F}`, { signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return (await r.json()).hits || []; };
-  const cgi = async () => { const r = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${qs}&search_simple=1&json=1&page_size=30&countries_tags_en=germany&lc=de${F}`, { signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return (await r.json()).products || []; };
+  const sal = async extra => { const r = await fetch(`https://search.openfoodfacts.org/search?q=${qs}${extra}&langs=en&page_size=30${F}`, { signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return (await r.json()).hits || []; };
+  const cgi = async () => { const r = await fetch(`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${qs}&search_simple=1&json=1&page_size=30&lc=en${F}`, { signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return (await r.json()).products || []; };
   const wait = ms => new Promise(r => setTimeout(r, ms));
-  const tries = [async () => { let h = await sal('%20countries_tags:%22en:germany%22'); if (h.length < 5) h = h.concat(await sal('')); return h; }, cgi,
+  const tries = [() => sal(''), cgi,
     async () => { await wait(1200); return sal(''); }, async () => { await wait(2000); return cgi(); }];
   let err;
   for (const tryFn of tries) {
@@ -185,7 +211,6 @@ function scoreFood(f, q) {
   if (name === nq) s += 100; else if (name.startsWith(nq)) s += 60; else if (new RegExp('\\b' + nq.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(name)) s += 40;
   if (words.every(w => (name + ' ' + brand).includes(w))) s += 25;
   if (brand && words.some(w => brand.includes(w))) s += 15;
-  if (f.de) s += 20;
   if (f.n && f.n.kcal > 0) s += 10;
   if (f.img) s += 5; if (f.serving?.g) s += 5; if (f.ns) s += 3; s += Math.min(10, (f.compl || 0) * 10);
   if (f.src === 'custom' || f.src === 'recipe') s += 30;

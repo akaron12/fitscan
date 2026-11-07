@@ -159,7 +159,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
     live();
     $$('[data-pi]', sh).forEach(b => b.onclick = () => { const p = presets[+b.dataset.pi]; if (units.some(u => u[0] === p[1])) ui2.value = p[1]; qi.value = inputNum(p[2]); live(); $$('[data-pi]', sh).forEach(x => x.classList.toggle('on', x === b)); });
     bindSeg(sh, 'fsMeal', m => { meal = m; if (!entry) $('#fsSave').textContent = t('Zu {m} hinzufügen', { m: mealName(m) }); });
-    $('#fsFav').onclick = () => { if (S.favorites[food.id]) delete S.favorites[food.id]; else S.favorites[food.id] = { ...food }; save(); $('#fsFav').innerHTML = I('star', S.favorites[food.id] ? 'fill' : ''); toast(t(S.favorites[food.id] ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')); };
+    $('#fsFav').onclick = () => { if (S.favorites[food.id]) removeFavorite(food.id); else setFavorite(food); save(); $('#fsFav').innerHTML = I('star', S.favorites[food.id] ? 'fill' : ''); toast(t(S.favorites[food.id] ? 'Zu Favoriten hinzugefügt' : 'Aus Favoriten entfernt')); };
     const doSave = status => {
       const g = grams(); if (!(g > 0)) return toast(t('Bitte Menge eingeben')); if (g > 2e4) return toast(t('Menge zu groß'));
       const u = units.find(x => x[0] === ui2.value), q = num(qi.value, 0, 1e4);
@@ -190,12 +190,12 @@ function customFoodSheet(f = null, code = '') {
       const v = id => num($('#' + id).value, 0, id === 'cfK' ? 900 : id === 'cfServ' ? 5000 : 100);
       const id = f?.id || 'cust:' + (code || uid());
       const food = { id, src: 'custom', code: code || f?.code || '', name, brand: $('#cfBrand').value.trim(), cat: 'Eigene', n: { kcal: v('cfK'), p: v('cfP'), c: v('cfC'), f: v('cfF'), sug: v('cfS'), fib: v('cfB'), salt: v('cfSa') }, serving: v('cfServ') ? { g: v('cfServ'), label: 'Portion' } : null };
-      S.foods[id] = food; if (S.favorites[id]) S.favorites[id] = { ...food };
+      saveCustomFood(food);
       save(); toast(t('Gespeichert')); if (ui.tab === 'library') rerender(); foodSheet(food);
     };
     if (f) $('#cfDel').onclick = async () => {
       if (!await confirmSheet({ title: t('„{n}“ löschen?', { n: esc(f.name) }), text: t('Bereits eingetragene Mahlzeiten bleiben erhalten.'), ok: t('Löschen'), danger: true })) return;
-      delete S.foods[f.id]; delete S.favorites[f.id]; save(); rerender(); toast(t('Gelöscht'));
+      deleteCustomFood(f.id); save(); rerender(); toast(t('Gelöscht'));
     };
   });
 }
@@ -229,7 +229,7 @@ function recipeSheet(r = null) {
       };
       if (r) $('#rDel').onclick = async () => {
         if (!await confirmSheet({ title: t('„{n}“ löschen?', { n: esc(rec.name) }), text: t('Bereits eingetragene Mahlzeiten bleiben erhalten.'), ok: t('Löschen'), danger: true })) return;
-        delete S.recipes[rec.id]; delete S.favorites[rec.id]; save(); rerender(); toast(t('Gelöscht'));
+        delete S.recipes[rec.id]; removeFavorite(rec.id); save(); rerender(); toast(t('Gelöscht'));
       };
     }, { keepScroll });
   };

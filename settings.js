@@ -20,8 +20,7 @@ function renderProfile(v) {
   <p class="hint pad">${t('Für Lebensmittel ohne Barcode (USDA FoodData Central, gemeinfrei). Kostenloser Key: fdc.nal.usda.gov/api-key-signup. Der Key bleibt nur auf diesem Gerät: kein Backup, keine Synchronisation.')}</p>
 
   <div class="sec"><h4>${t('Darstellung')}</h4></div>
-  <div class="card list"><div class="row-item"><span class="grow nm">${t('Design')}</span>${seg('sTheme', [['light', t('Hell')], ['dark', t('Dunkel')], ['system', t('Auto')]], st.theme, 'sm')}</div>
-    <div class="row-item"><span class="grow nm">${t('Sprache')}</span>${seg('sLang', [['de', 'Deutsch'], ['en', 'English']], LANG, 'sm')}</div></div>
+  <div class="card list"><div class="row-item"><span class="grow nm">${t('Design')}</span>${seg('sTheme', [['light', t('Hell')], ['dark', t('Dunkel')], ['system', t('Auto')]], st.theme, 'sm')}</div></div>
 
   <div class="sec"><h4>${t('Synchronisation')}</h4></div>
   <div class="card list" id="syncCard">${window.syncCardHtml ? syncCardHtml() : ''}</div>
@@ -44,7 +43,6 @@ function renderProfile(v) {
   const sv = () => { st.beep = $('#sBeep').checked; st.continuousScan = $('#sCont').checked; save(); };
   $$('#sBeep,#sCont', v).forEach(i => i.onchange = sv);
   bindSeg(v, 'sTheme', th => { st.theme = th; save(); applyTheme(); });
-  bindSeg(v, 'sLang', l => { setLang(l); save(); rerender(); });
   $('#exJson').onclick = () => download(`fitscan-backup-${today()}.json`, JSON.stringify({ app: 'fitscan', version: 4, exported: new Date().toISOString(), data: S }, null, 1), 'application/json');
   $('#exCsv').onclick = () => {
     const rows = [['Datum', 'Mahlzeit', 'Lebensmittel', 'Marke', 'Menge (g)', 'kcal', 'Protein (g)', 'Kohlenhydrate (g)', 'Fett (g)', 'Zucker (g)', 'Ballaststoffe (g)', 'Salz (g)'].map(x => t(x))];
@@ -56,11 +54,11 @@ function renderProfile(v) {
     let data; try { const j = JSON.parse(await f.text()); data = j.data || j; if (!data.entries || !data.goals) throw 0; } catch { return toast(t('Ungültige Backup-Datei')); }
     if (!await confirmSheet({ title: t('Backup importieren?'), text: t('Deine aktuellen Daten werden durch das Backup ersetzt.'), ok: t('Importieren') })) return;
     delete data.sync;   // sync bookkeeping belongs to this device only
-    const keepLang = S.settings.lang; S = sanitize(data); S.settings.lang ||= keepLang; save(); setLang(S.settings.lang || LANG); applyTheme(); rerender(); toast(t('Backup importiert'));
+    S = sanitize(data); save(); applyTheme(); rerender(); toast(t('Backup importiert'));
   };
   $('#wipe').onclick = async () => {
     if (!await confirmSheet({ title: t('Alle Daten löschen?'), text: t('Tagebuch, eigene Lebensmittel und Einstellungen werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden.'), ok: t('Alle Daten löschen'), danger: true })) return;
-    const { theme, lang } = S.settings; S = sanitize({}); Object.assign(S.settings, { theme, lang }); save(); ui.date = today(); render(); toast(t('Alle Daten gelöscht'));
+    const { theme } = S.settings; S = sanitize({}); S.settings.theme = theme; save(); ui.date = today(); render(); toast(t('Alle Daten gelöscht'));
   };
 }
 
@@ -80,8 +78,7 @@ function goalsSheet() {
 }
 
 // ---------- Startup ----------
-function setLang(l) { S.settings.lang = l; applyLang(l); }
-setLang(S.settings.lang || (/^de\b/i.test(navigator.language || '') ? 'de' : 'en'));
+applyLang('en');   // English is the only language (the German source strings are internal lookup keys)
 applyTheme();
 render();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {

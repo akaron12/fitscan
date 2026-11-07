@@ -148,8 +148,10 @@ const EN = {
   'Fleisch': 'Meat', 'Wurst': 'Cold cuts', 'Fisch': 'Fish', 'Hülsenfrüchte': 'Legumes', 'Nüsse': 'Nuts & seeds', 'Süßes': 'Sweets', 'Supplemente': 'Supplements', 'Getränke': 'Drinks',
   'Saucen': 'Sauces', 'Trockenobst': 'Dried fruit',
 };
-let LANG = 'de';
-const LOC = () => LANG === 'en' ? 'en-US' : 'de-DE';
+// English is the only language. The German strings used as keys throughout the code are internal lookup keys for the table above;
+// t() returns the English text, and dates/numbers use English formats.
+let LANG = 'en';
+const LOC = () => 'en-US';
 const I18N_MISSING = new Set();
 function t(s, vars) {
   let r = s;
@@ -171,7 +173,7 @@ function tFood(s) {
     .replace(/\bca\. /g, 'approx. ');
 }
 function applyLang(lang) {
-  LANG = lang === 'en' ? 'en' : 'de'; document.documentElement.lang = LANG;
+  LANG = 'en'; document.documentElement.lang = LANG;
   document.querySelectorAll('[data-t]').forEach(el => el.textContent = t(el.dataset.t));
   document.querySelectorAll('[data-tl]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.tl)); el.title = t(el.dataset.tl); });
 }
