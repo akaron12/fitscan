@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Drive sign-in test</title>
+<style>
+  body{font:16px/1.5 system-ui,sans-serif;margin:0;padding:16px;max-width:40rem;margin-inline:auto;color:#1c1c1e;background:#fff}
+  @media(prefers-color-scheme:dark){body{background:#000;color:#f2f2f7}pre{background:#1c1c1e}}
+  h1{font-size:1.3rem;margin:.2rem 0 1rem}
+  button{font:inherit;padding:.7rem 1rem;margin:.25rem .25rem .25rem 0;border-radius:10px;border:1px solid #888;background:transparent;color:inherit}
+  button.primary{background:#0a84ff;border-color:#0a84ff;color:#fff}
+  pre{background:#f2f2f7;padding:12px;border-radius:10px;white-space:pre-wrap;word-break:break-word;font-size:13px;min-height:8rem}
+  .row{margin:.5rem 0}
+</style>
+</head>
+<body>
+<h1>Drive sign-in test</h1>
+<p>Throwaway page to check Google sign-in and Drive access. It only touches <code>AI Memory/Meal Tracker/_spike-test.md</code>.</p>
+<div class="row" id="env"></div>
+<div class="row">
+  <button class="primary" id="signin">1. Sign in</button>
+  <button id="silent">Silent renew</button>
+  <button id="list">2. Find AI Memory</button>
+  <button id="write">3. Write test file</button>
+  <button id="trash">4. Trash test file</button>
+</div>
+<pre id="log"></pre>
+
+<script>
+const CLIENT_ID = '806305125271-jqii8egsi0ifs1e1di3bkhnta4ram8bj.apps.googleusercontent.com';
+const SCOPE = 'https://www.googleapis.com/auth/drive';
+const HINT = 'adammkaron@gmail.com';
+const $ = s => document.querySelector(s);
+const logEl = $('#log');
+const log = (...a) => { logEl.textContent += a.map(x => typeof x === 'string' ? x : JSON.stringify(x, null, 1)).join(' ') + '\n'; };
+let token = null, expiresAt = 0, testFileId = null, mealFolderId = null, client = null;
+
+$('#env').textContent = `standalone=${!!navigator.standalone || matchMedia('(display-mode: standalone)').matches} · origin=${location.origin}`;
+log('UA:', navigator.userAgent);
+
+function ready() {
+  return new Promise((res, rej) => {
+    if (window.google?.accounts?.oauth2) return res();
+    const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = res; s.onerror = () => rej(new Error('Could not load Google sign-in script (offline?)'));
+    document.head.appendChild(s);
+  });
+}
+async function init() {
+  await ready();
+  client = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID, scope: SCOPE, hint: HINT,
+    callback: r => {
+      if (r.error) return log('AUTH ERROR:', r.error, r.error_description || '');
+      token = r.access_token; expiresAt = Date.now() + (+r.expires_in || 0) * 1000;
+      log(`SIGNED IN. expires_in=${r.expires_in}s scope_ok=${(r.scope || '').includes('auth/drive')}`);
+    },
+    error_callback: e => log('POPUP/ERROR CALLBACK:', e.type, e.message || '')
+  });
+}
+const api = async (path, opt = {}) => {
+  if (!token || Date.now() > expiresAt) throw new Error('No valid token – sign in first');
+  const r = await fetch('https://www.googleapis.com' + path, { ...opt, headers: { Authorization: 'Bearer ' + token, ...(opt.headers || {}) } });
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 300)}`);
+  return r.json();
+};
+const q = s => encodeURIComponent(s);
+const find = async (name, parent) => {
+  let query = `name='${name.replace(/'/g, "\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  if (parent) query += ` and '${parent}' in parents`;
+  const j = await api(`/drive/v3/files?q=${q(query)}&fields=files(id,name,modifiedTime,parents)&pageSize=20`);
+  return j.files;
+};
+const run = fn => async () => { try { await fn(); } catch (e) { log('ERROR:', e.message); } };
+
+$('#signin').onclick = run(async () => { if (!client) await init(); log('Requesting token (popup)…'); client.requestAccessToken({ prompt: '' }); });
+$('#silent').onclick = run(async () => { if (!client) await init(); log('Silent renew attempt (no prompt)…'); client.requestAccessToken({ prompt: 'none' }); });
+$('#list').onclick = run(async () => {
+  const am = await find('AI Memory'); log(`AI Memory folders found: ${am.length}`, am.map(f => f.id));
+  if (am.length) { const mt = await find('Meal Tracker', am[0].id); log(`Meal Tracker inside first AI Memory: ${mt.length}`, mt.map(f => f.id)); mealFolderId = mt[0]?.id || null; }
+});
+$('#write').onclick = run(async () => {
+  const am = await find('AI Memory'); if (!am.length) return log('No AI Memory folder visible – NOT creating anything.');
+  if (!mealFolderId) {
+    const mt = await find('Meal Tracker', am[0].id);
+    mealFolderId = mt[0]?.id || (await api('/drive/v3/files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Meal Tracker', mimeType: 'application/vnd.google-apps.folder', parents: [am[0].id] }) })).id;
+  }
+  const boundary = 'b' + Date.now(), meta = { name: '_spike-test.md', parents: [mealFolderId], mimeType: 'text/markdown' };
+  const body = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: text/markdown\r\n\r\nsign-in test ${new Date().toISOString()}\r\n--${boundary}--`;
+  const f = await api('/upload/drive/v3/files?uploadType=multipart&fields=id,name', { method: 'POST', headers: { 'Content-Type': 'multipart/related; boundary=' + boundary }, body });
+  testFileId = f.id; log('WROTE', f);
+});
+$('#trash').onclick = run(async () => {
+  if (!testFileId) return log('No test file id in this session.');
+  await api(`/drive/v3/files/${testFileId}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+  log('Trashed test file', testFileId); testFileId = null;
+});
+init().catch(e => log('INIT ERROR:', e.message));
+</script>
+</body>
+</html>
