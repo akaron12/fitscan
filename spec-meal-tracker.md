@@ -92,6 +92,7 @@ GitHub Action stamps service-worker cache version from commit; "update available
 | D21 | Extra fields | Passthrough + optional schema keys | Round-trip safety | Red Team | 2026-11-06 |
 | D22 | Minor risks | Rolling window + 60d tombstones; local dates; attribution/backoff | Defaults adopted | Red Team | 2026-11-06 |
 | D23 | Language | English only: no language switch, English formats, built-in foods and serving names renamed to English, Open Food Facts search no longer tuned for Germany. German strings stay in the code as internal lookup keys | User asked to remove German (replaces the earlier assumption to keep DE/EN) | Interview | 2026-11-07 |
+| D24 | Recents | Keep unique foods for a user-set window (default 30 days; 7/14/30/60/90), last quantity as default, "Most used" sort, synced via settings.md (supersedes recents-local in D4). See docs/feature-recents-window.md | Re-add regular foods without a lookup | Interview | 2026-11-08 |
 
 ## Dependency Graph & Implementation Order
 1. Fork, strip removed features, rename (no deps).
