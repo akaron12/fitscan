@@ -8,7 +8,7 @@ const eq = (a, b, msg) => { const A = JSON.stringify(a), B = JSON.stringify(b); 
 const ok = (c, msg) => eq(!!c, true, msg);
 
 const html = read('index.html'), sw = read('sw.js');
-const APP_JS = ['i18n.js', 'icons.js', 'core.js', 'ui.js', 'usda.js', 'diary.js', 'food.js', 'progress.js', 'settings.js', 'dayfile.js', 'merge.js', 'driveclient.js', 'driveauth.js', 'sync.js', 'syncapp.js', 'sw.js'];
+const APP_JS = ['i18n.js', 'icons.js', 'core.js', 'ui.js', 'usda.js', 'swipe.js', 'diary.js', 'food.js', 'progress.js', 'settings.js', 'dayfile.js', 'merge.js', 'driveclient.js', 'driveauth.js', 'sync.js', 'syncapp.js', 'sw.js'];
 
 // ---- 1. CSP ----
 const cspM = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html); ok(cspM, 'index.html has a Content-Security-Policy meta tag');
