@@ -57,7 +57,7 @@ recents:
 Merge per food id: newest `last` wins for `last`, `lastG` and the snapshot; `uses` takes the larger of the two sides (counts from two devices can't be summed without double-counting). Absence in an incoming file never deletes a food; only the window removes it, consistent with D7/D15. Unknown keys pass through (D21). The `recentsDays` setting is stored alongside goals.
 
 ## Sync trade-offs
-- `settings.md` grows by one entry per recent food (up to a few hundred lines at 90 days). Acceptable, but keep snapshots compact: omit `img` and empty fields.
+- `settings.md` grows by one entry per recent food (up to a few hundred lines at 90 days). Acceptable, and snapshots are written as they are (including `img`), so a second device shows the same thumbnails.
 - Claude reads `settings.md` too, so FORMAT.md must say: recents are app-managed, do not edit.
 - Drive's 14-day window applies to day files, not `settings.md`, so a new device gets the full recents list on first pull.
 
