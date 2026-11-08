@@ -192,16 +192,13 @@
         const pend = new Set(pendingDays());
         const localDays = [...new Set([...Object.keys(S().entries), ...Object.keys(S().tombstones || {})])].filter(d => win.has(d) || pend.has(d));
         const dates = [...new Set([...remoteDays, ...localDays, ...(visibleDate ? [visibleDate] : [])])].sort();
+        if (wide) for (const d of dates) await syncDay(d, groups[`${d}.md`], folderId, { readOnlyPass: true });   // first sync: pull everything before writing anything
         let pulled = 0, pushed = 0;
-        const suggBefore = s.suggestions.length;
-        if (wide) for (const d of dates) pulled += (await syncDay(d, groups[`${d}.md`], folderId, { readOnlyPass: true })).pulled || 0;   // first sync: pull everything before writing anything (and count it, so the screen redraws)
         for (const d of dates) { const r = await syncDay(d, groups[`${d}.md`], folderId); pulled += r.pulled || 0; pushed += r.pushed || 0; }
         const settings = await syncSettings(folderId), goals = settings.goals;
         for (const d of Object.keys(s.days)) if (d < addDaysISO(today(), -KEEP_DAYS)) delete s.days[d];
         s.synced = true; s.lastSync = now(); persist();
-        // changed = anything on screen may now differ: meals pulled, goals adopted from Drive, custom foods/favorites pulled, or new suggested changes
-        const changed = pulled > 0 || goals === 'adopted' || /pulled|merged/.test(settings.library || '') || s.suggestions.length > suggBefore;
-        setState('idle'); return { ok: true, pulled, pushed, goals, library: settings.library, changed };
+        setState('idle'); return { ok: true, pulled, pushed, goals, library: settings.library };
       } catch (e) {
         const k = e.kind;
         setState(k === 'auth' ? 'auth' : k === 'network' ? 'offline' : 'error', e.message); persist();

@@ -36,7 +36,7 @@ function renderProfile(v) {
   $('#pGoals').onclick = goalsSheet; window.bindSyncCard?.();
   $('#sUsda').onchange = e => { USDA.setKey(e.target.value); e.target.value = USDA.getKey(); toast(t(USDA.getKey() ? 'USDA-Key gespeichert' : 'USDA-Key entfernt')); };
   $('#sUsdaTest').onclick = async () => {
-    USDA.setKey($('#sUsda').value); $('#sUsda').value = USDA.getKey(); if (!USDA.getKey()) return toast(t('Bitte zuerst einen Key einfügen'));
+    USDA.setKey($('#sUsda').value); if (!USDA.getKey()) return toast(t('Bitte zuerst einen Key einfügen'));
     try { const r = await USDA.search('apple'); toast(t('Key funktioniert – {n} Treffer', { n: r.length })); }
     catch (e) { toast(t(USDA_MSG[e.kind] || USDA_MSG.http)); }
   };

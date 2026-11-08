@@ -57,7 +57,7 @@ function renderDiary(v) {
 }
 function entryRow(e) {
   const n = nutr(e.food, e.g), planned = !isEaten(e), note = e.x?.note ? ` · ${esc(e.x.note)}` : '', pend = e.food.src === 'pending';
-  return `<div class="row-item entry${planned ? ' planned' : ''}" data-eid="${esc(e.id)}" data-del="${t('Löschen')}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${planned ? `<span class="plan-tag">${t('Geplant')}</span> ` : ''}${pend ? `<span class="plan-tag">${e.pending?.notFound ? t('Nicht gefunden') : '⏳ ' + t('Wartet auf Netz')}</span> ` : ''}${esc(entryLabel(e))} · P ${r0(n.p)} · ${t('K')} ${r0(n.c)} · F ${r0(n.f)}${note}</div></div><div class="kcal">${de(n.kcal)}</div>${planned ? `<button class="chk" data-chk="${esc(e.id)}" aria-label="${t('Als gegessen bestätigen')}" title="${t('Als gegessen bestätigen')}">${I('check')}</button>` : ''}</div>`;
+  return `<div class="row-item entry${planned ? ' planned' : ''}" data-eid="${esc(e.id)}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${planned ? `<span class="plan-tag">${t('Geplant')}</span> ` : ''}${pend ? `<span class="plan-tag">${e.pending?.notFound ? t('Nicht gefunden') : '⏳ ' + t('Wartet auf Netz')}</span> ` : ''}${esc(entryLabel(e))} · P ${r0(n.p)} · ${t('K')} ${r0(n.c)} · F ${r0(n.f)}${note}</div></div><div class="kcal">${de(n.kcal)}</div>${planned ? `<button class="chk" data-chk="${esc(e.id)}" aria-label="${t('Als gegessen bestätigen')}" title="${t('Als gegessen bestätigen')}">${I('check')}</button>` : ''}</div>`;
 }
 /** Eaten totals drive the ring; planned meals only show as a projection. */
 function projLine(tt, pt, g) {
@@ -76,11 +76,6 @@ function copyEntries(src, to) {
   const copies = src.map(e => ({ ...e, id: uid(), status: 'eaten', rev: 1 })); (S.entries[to] ||= []).push(...copies); save(); rerender();
   undoable(t('{n} Einträge kopiert', { n: copies.length }), () => { copies.forEach(c => removeEntry(to, c)); save(); rerender(); });
 }
-/** Swipe left on a diary row: same delete + Undo as the sheet's Delete button. */
-Swipe.attach($('#view'), { rowSel: '.row-item.entry', onDelete: row => {
-  const date = ui.date, e = (S.entries[date] || []).find(x => x.id === row.dataset.eid);
-  if (e) deleteEntry(date, e); else rerender();
-} });
 function deleteEntry(date, e) {
   const i = removeEntry(date, e); if (i < 0) return;
   save(); closeSheet(); rerender();

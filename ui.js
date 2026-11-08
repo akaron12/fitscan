@@ -28,7 +28,7 @@ function openSheet(html, onMount, { keepScroll = false } = {}) {
 function closeSheet() {
   const sh = $('#sheet'), bd = $('#sheetBackdrop'); if (sh.classList.contains('hidden')) return;
   sh.classList.add('closing'); bd.classList.add('closing');
-  sheetTimer = setTimeout(() => { sh.classList.add('hidden'); bd.classList.add('hidden'); sh.classList.remove('closing'); bd.classList.remove('closing'); sh.innerHTML = ''; try { window.onSheetClosed?.(); } catch {} }, 200);
+  sheetTimer = setTimeout(() => { sh.classList.add('hidden'); bd.classList.add('hidden'); sh.classList.remove('closing'); bd.classList.remove('closing'); sh.innerHTML = ''; }, 200);
 }
 const sheetOpen = () => !$('#sheet').classList.contains('hidden');
 $('#sheetBackdrop').onclick = closeSheet;

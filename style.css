@@ -68,14 +68,6 @@ main { padding: 6px 16px 24px; }
 .row-item.nav { --inset: 60px; }
 button.row-item:active, .row-item.food:active, .row-item.entry:active, label.row-item.nav:active { background: var(--fill2); }
 .row-item.food, .row-item.entry, label.row-item.nav { cursor: pointer; }
-/* swipe left to delete (swipe.js): the row slides left and a red "Delete" strip follows it in from the right */
-.meal .list { overflow: hidden; }
-.row-item.entry { touch-action: pan-y; transition: transform .17s ease; }
-.row-item.entry.swiping { transition: none; }
-.row-item.entry.swiping, .row-item.entry.leaving { background: var(--fill); z-index: 1; }
-.row-item.entry::after { content: attr(data-del); position: absolute; top: 0; bottom: 0; left: 100%; width: 100%; display: flex; align-items: center; padding-left: 20px; box-sizing: border-box; background: var(--danger); color: #fff; font-weight: 600; opacity: 0; transition: opacity .1s; }
-.row-item.entry.swiping::after, .row-item.entry.leaving::after { opacity: 1; }
-.row-item.entry.will-delete::after { background: var(--danger-ink); }
 .nm { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-val { font-size: 15px; color: var(--mut); white-space: nowrap; }
