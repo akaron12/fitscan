@@ -12,6 +12,7 @@ echo "== english only"; "$JSC" i18n.js foods.js tests/i18n.test.js || status=1
 echo "== usda"; "$JSC" usda.js tests/usda.test.js || status=1
 echo "== swipe"; "$JSC" swipe.js tests/swipe.test.js || status=1
 echo "== macros"; "$JSC" macros.js tests/macros.test.js || status=1
-echo "== merge"; "$JSC" dayfile.js merge.js tests/merge.test.js || status=1
-echo "== sync engine"; "$JSC" dayfile.js merge.js driveclient.js sync.js tests/fake-drive.js tests/sync.test.js || status=1
+echo "== recents"; "$JSC" recents.js dayfile.js merge.js tests/recents.test.js || status=1
+echo "== merge"; "$JSC" recents.js dayfile.js merge.js tests/merge.test.js || status=1
+echo "== sync engine"; "$JSC" recents.js dayfile.js merge.js driveclient.js sync.js tests/fake-drive.js tests/sync.test.js || status=1
 exit $status

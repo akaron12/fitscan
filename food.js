@@ -48,16 +48,16 @@ function bindList(root, list) {
   });
 }
 function quickLog(f) {
-  const p = defaultPortion(f), meal = ui.targetMeal || mealDefault(), date = ui.date;
+  const p = startPortion(f), meal = ui.targetMeal || mealDefault(), date = ui.date;
   const e = addEntry(f, p.g, p.label, meal, date, { unit: p.unit, qty: p.qty });
   undoable(t('{name} · {k} kcal zu {m}', { name: f.name, k: de(nutr(f, p.g).kcal), m: mealName(meal) }), () => deleteSilently(date, e));
 }
 function fillLibList() {
   const el = $('#lList'); if (!el) return;
   if (ui.query.trim()) return doSearch(true);
-  let list = [], top = '', empty = null, grouped = false;
+  let list = [], top = '', empty = null, grouped = false, sortBar = '';
   switch (ui.libTab) {
-    case 'recent': top = actionRow('aQuick', 'zap', t('Schnelleintrag'), t('Nur Kalorien oder Makros')) + (S.recents.length ? '' : actionRow('aBasics', 'book', t('Eingebaute Lebensmittel durchsuchen'), t('Über 500 Lebensmittel. Mit dem Stern merkst du Favoriten.'))); list = S.recents; empty = ['clock', t('Hier erscheinen zuletzt eingetragene Lebensmittel.')]; break;
+    case 'recent': top = actionRow('aQuick', 'zap', t('Schnelleintrag'), t('Nur Kalorien oder Makros')) + (S.recents.length ? '' : actionRow('aBasics', 'book', t('Eingebaute Lebensmittel durchsuchen'), t('Über 500 Lebensmittel. Mit dem Stern merkst du Favoriten.'))); list = recentsList(); sortBar = list.length > 1 ? `<div class="rsort">${seg('rSort', [['recent', t('Zuletzt')], ['used', t('Meistbenutzt')]], S.settings.recentsSort, 'sm')}</div>` : ''; empty = ['clock', t('Hier erscheinen zuletzt eingetragene Lebensmittel.')]; break;
     case 'fav': list = Object.values(S.favorites); empty = ['star', t('Noch keine Favoriten. Tippe beim Lebensmittel auf den Stern.')]; break;
     case 'scans': list = dedupe(S.scanHistory.map(h => Object.values(S.foods).find(f => f.code === h.code) || S.products[h.code]).filter(Boolean)); empty = ['scan', t('Hier erscheinen deine gescannten Produkte – auch offline verfügbar.')]; break;
     case 'custom': top = actionRow('aCustom', 'plus', t('Eigenes Lebensmittel anlegen'), t('Mit Nährwerten von der Verpackung')); list = Object.values(S.foods); break;
@@ -67,7 +67,8 @@ function fillLibList() {
   let rows = '';
   if (grouped) { let cat = null; for (const f of list) { if (f.cat !== cat) { cat = f.cat; rows += `<div class="list-h">${esc(tFood(cat))}</div>`; } rows += foodRow(f); } }
   else rows = list.map(foodRow).join('');
-  el.innerHTML = (top ? `<div class="card list">${top}</div>` : '') + (list.length ? `<div class="card list">${rows}</div>` : empty ? emptyState(...empty) : '');
+  el.innerHTML = (top ? `<div class="card list">${top}</div>` : '') + sortBar + (list.length ? `<div class="card list">${rows}</div>` : empty ? emptyState(...empty) : '');
+  if ($('#rSort')) bindSeg(el, 'rSort', v => { S.settings.recentsSort = v; save(true); fillLibList(); });
   if ($('#aQuick')) $('#aQuick').onclick = () => quickAddSheet(ui.targetMeal);
   if ($('#aBasics')) $('#aBasics').onclick = () => { ui.libTab = 'base'; rerender(); };
   if ($('#aCustom')) $('#aCustom').onclick = () => customFoodSheet();
@@ -118,7 +119,7 @@ function multiBar() {
   bar.innerHTML = `<span class="grow">${t('{n} ausgewählt', { n: picked.size })}</span><button class="btn sm" id="mbAdd" ${picked.size ? '' : 'disabled'}>${t('Zu {m} hinzufügen', { m: mealName(meal) })}</button>`;
   $('#mbAdd').onclick = () => {
     let k = 0; const n = picked.size, date = ui.date, added = [];
-    for (const f of picked.values()) { const p = defaultPortion(f); added.push(addEntry(f, p.g, p.label, meal, date, { unit: p.unit, qty: p.qty })); k += nutr(f, p.g).kcal; }
+    for (const f of picked.values()) { const p = startPortion(f); added.push(addEntry(f, p.g, p.label, meal, date, { unit: p.unit, qty: p.qty })); k += nutr(f, p.g).kcal; }
     ui.targetMeal = null; go('diary');
     undoable(t('{n} Lebensmittel · {k} kcal hinzugefügt', { n, k: de(k) }), () => { added.forEach(x => removeEntry(date, x)); save(); rerender(); });
   };
@@ -132,6 +133,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
   if (/Getränke/.test(food.cat || '')) units.push(['ml', 'ml', 1]);
   let unit = entry ? (entry.unit || 'g') : (food.serving?.g ? 'serv' : 'g'), qty = entry ? (entry.qty ?? entry.g) : (food.serving?.g ? 1 : 100);
   if (!units.some(u => u[0] === unit)) { unit = 'g'; qty = entry ? entry.g : 100; }
+  if (!entry) { const sp = startPortion(food); if (units.some(u => u[0] === sp.unit)) { unit = sp.unit; qty = sp.qty; } }   // start from the amount used last time
   let meal = entry ? entry.meal : (ui.targetMeal || mealDefault());
   const presets = [];
   const last = !entry && Object.values(S.entries).flat().reverse().find(e => e.food.id === food.id && !e.quick);
@@ -377,14 +379,14 @@ let resolving = false;
 async function resolvePending() {
   if (resolving || navigator.onLine === false) return; resolving = true; let found = 0, missing = 0;
   try {
-    for (const es of Object.values(S.entries)) for (const e of es) {
+    for (const [dk, es] of Object.entries(S.entries)) for (const e of es) {
       if (e.food?.src !== 'pending' || e.pending?.notFound) continue;
       let res; try { res = await lookupBarcode(e.food.code); } catch { continue; }
       if (!res.product) { e.pending = { ...(e.pending || {}), notFound: true }; missing++; continue; }
       const p = res.product, manual = e.pending?.manual ?? (e.food.n.kcal > 0);
       const snap = { id: p.id, name: p.name, brand: p.brand || '', img: p.img || '', cat: p.cat || '', n: manual ? e.food.n : p.n, serving: p.serving || null, src: p.src, code: p.code };
       if (p.micro && !manual) snap.micro = p.micro; if (p.ns) snap.ns = p.ns; if (p.nova) snap.nova = p.nova;
-      touch(e, { food: snap }); delete e.pending; S.recents = [snap, ...S.recents.filter(x => x.id !== snap.id)].slice(0, 40); found++;
+      touch(e, { food: snap }); delete e.pending; rememberRecent(snap, dk, e.g, e.unit, e.qty); found++;
     }
   } finally { resolving = false; }
   if (found || missing) { save(); if (!sheetOpen() && !$('#onb')) rerender(); }

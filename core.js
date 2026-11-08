@@ -67,13 +67,19 @@ function sanitize(o) {
     for (const [id, tb] of Object.entries(m)) if (!isObj(tb) || !(+tb.at > cutoff)) delete m[id];
     if (!Object.keys(m).length) delete s.tombstones[dk];
   }
-  s.recents = s.recents.filter(f => isObj(f) && isObj(f.n));
   const st = s.settings;
   for (const k of ['waterGoal', 'glass', 'fastTarget', 'showWater', 'showFasting', 'onboarded', 'planStart', 'lang']) delete st[k];
   st.continuousScan ??= false; st.beep ??= true;
   // v6: new light design – earlier versions defaulted to dark, so switch everyone to light once.
   if (st.ui !== 6) { st.theme = 'light'; st.ui = 6; }
   if (!['light', 'dark', 'system'].includes(st.theme)) st.theme = 'light';
+  // Recents: a window of days (a setting, synced), a sort, and the one-time upgrade from the old list of 40 (no dates) using the diary.
+  st.recentsDays = Recents.DAYS.includes(+st.recentsDays) ? +st.recentsDays : Recents.DEFAULT_DAYS;
+  st.recentsRev = Math.max(0, Math.floor(+st.recentsRev) || 0);
+  if (!['recent', 'used'].includes(st.recentsSort)) st.recentsSort = 'recent';
+  let rec = s.recents.filter(f => isObj(f) && isObj(f.n) && f.id != null);
+  if (!st.recentsV2) { rec = Recents.migrate(rec, s.entries, today(), st.recentsDays); st.recentsV2 = true; }
+  s.recents = Recents.prune(Recents.normalize(rec, today()), today(), st.recentsDays);
   s.version = 6;
   return s;
 }
@@ -101,12 +107,19 @@ const isLogged = d => (S.entries[d] || []).some(isEaten);
 function streak() { let n = 0, d = today(); if (!isLogged(d)) d = addDays(d, -1); while (isLogged(d)) { n++; d = addDays(d, -1); } return n; }
 function mealDefault() { const h = new Date().getHours(); return h < 10 ? 'breakfast' : h < 15 ? 'lunch' : h < 21 ? 'dinner' : 'snacks'; }
 
+// Recents: the food, with the day and amount of this log, goes to the top of the list (see recents.js).
+const rememberRecent = (snap, date, g, unit, qty) => { S.recents = Recents.touch(S.recents, snap, { date, today: today(), days: S.settings.recentsDays, g, unit, qty }); };
+const recentsList = () => Recents.view(S.recents, today(), S.settings.recentsDays, S.settings.recentsSort);
+function setRecentsDays(days) {   // the revision lets a sync tell which device changed it last
+  S.settings.recentsDays = days; S.settings.recentsRev = (S.settings.recentsRev || 0) + 1;
+  S.recents = Recents.prune(S.recents, today(), days); save();
+}
 function addEntry(food, g, label, meal, date = ui.date, extra = {}) {
   const snap = { id: food.id, name: food.name, brand: food.brand || '', img: food.img || '', cat: food.cat || '', n: food.n, serving: food.serving || null, src: food.src, code: food.code || '' };
   if (food.micro) snap.micro = food.micro; if (food.ns) snap.ns = food.ns; if (food.nova) snap.nova = food.nova;
   const e = { id: uid(), meal, status: 'eaten', rev: 1, g, label, food: snap, ...extra };
   (S.entries[date] ||= []).push(e);
-  if (food.src !== 'quick' && food.src !== 'pending') S.recents = [snap, ...S.recents.filter(x => x.id !== snap.id)].slice(0, 40);
+  if (food.src !== 'quick' && food.src !== 'pending') rememberRecent(snap, date, g, extra.unit, extra.qty);
   save(); return e;
 }
 // Every app-side change to an entry bumps its revision, so a later sync can order edits without trusting device clocks.
@@ -142,6 +155,15 @@ function saveCustomFood(food) {
 function deleteCustomFood(id) {
   const old = S.foods[id]; if (old) S.libTombs.foods[id] = { rev: (old.rev || 0) + 1, at: Date.now() };
   delete S.foods[id]; removeFavorite(id);
+}
+// The amount to start from when adding a food again: what you used last time (recents), else one serving or 100 g.
+function startPortion(f) {
+  const d = defaultPortion(f), rc = S.recents.find(r => r.id === f.id), q = rc?.lastQ, u = rc?.lastU;
+  if (!(q > 0)) return d;
+  const per = u === 'g' || u === 'ml' ? 1 : u === 'serv' ? f.serving?.g : u === 'pc' ? f.piece?.g : 0;
+  if (!(per > 0)) return d;
+  const label = u === 'g' ? `${de(q)} g` : u === 'ml' ? `${de(q)} ml` : `${de(q, q % 1 ? 1 : 0)} × ${u === 'serv' ? f.serving.label || 'Portion' : 'Stück'}`;
+  return { g: q * per, label, unit: u, qty: q };
 }
 const defaultPortion = f => f.serving?.g ? { g: f.serving.g, label: `1 × ${f.serving.label}`, unit: 'serv', qty: 1 } : { g: 100, label: '100 g', unit: 'g', qty: 100 };
 // ---------- Weekly insights ----------

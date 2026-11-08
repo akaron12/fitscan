@@ -1,6 +1,6 @@
 # Feature: Recents keeps a configurable window (default 30 days) of unique foods
 
-Status: decisions settled 2026-11-08, ready to implement. Not implemented.
+Status: implemented 2026-11-08 (`recents.js`, merge/sync in `merge.js` and `sync.js`, tests in `tests/recents.test.js`).
 
 ## Problem
 The Recent tab (`Zuletzt`) holds only the last 40 foods logged, a count cap rather than a time window. A heavy logging week pushes out foods eaten three weeks ago, so repeat foods have to be searched for again.
@@ -36,7 +36,7 @@ Recent lists every unique food logged within a user-set window (default 30 days)
 ## Data model
 Each recents snapshot gains:
 - `last`: `YYYY-MM-DD` of the most recent log.
-- `lastG`: grams (or serving quantity) of that log.
+- `lastG`: grams of that log, plus `lastU` / `lastQ`: the unit (`g`, `ml`, `serv`, `pc`) and quantity typed, so "1.5 servings" comes back as 1.5 servings. Re-adding recomputes grams from the food's current serving size.
 - `uses`: number of times logged within the window.
 
 Pruning: on load, on each `addEntry`, and after each sync, drop snapshots with `last` older than the window.

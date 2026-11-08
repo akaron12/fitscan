@@ -180,9 +180,58 @@
     return f;
   }
 
+  // ---------- recents (settings.md): the foods logged within the window ----------
+  // Matched by food id. The newer `last` wins (the same food, logged on two devices: whichever was logged later supplies the amount and the
+  // snapshot); `uses` takes the larger count (counts from two devices cannot be added without counting twice). Nothing is ever deleted because
+  // it is missing from the other side: only the window removes a food. The window itself is a setting {days, rev}: the higher rev wins.
+  const REC_DATE = /^\d{4}-\d{2}-\d{2}$/, REC_DAYS = [7, 14, 30, 60, 90], REC_MAX = 300;
+  function cleanRecent(o, strict) {
+    const bad = m => { throw new Error(m); };
+    const { rev, ...f } = cleanFood({ ...o, rev: undefined }, strict);
+    if (typeof o.last !== 'string' || !REC_DATE.test(o.last)) bad('last must be a date (YYYY-MM-DD)');
+    f.last = o.last;
+    const good = (v, max) => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= max;
+    if (o.uses != null && !(Number.isInteger(o.uses) && o.uses >= 1)) { if (strict) bad('uses must be a whole number >= 1'); }
+    f.uses = Number.isInteger(o.uses) && o.uses >= 1 ? o.uses : 1;
+    if (o.lastG != null) { if (good(o.lastG, 2e4)) f.lastG = r1(o.lastG); else if (strict) bad('lastG must be a number greater than 0'); }
+    if (o.lastU != null || o.lastQ != null) {
+      if (['g', 'ml', 'serv', 'pc'].includes(o.lastU) && good(o.lastQ, 1e4)) { f.lastU = o.lastU; f.lastQ = o.lastQ; } else if (strict) bad('lastU/lastQ invalid');
+    }
+    return f;
+  }
+  const recDays = d => d && typeof d === 'object' && REC_DAYS.includes(d.days) && Number.isInteger(d.rev) && d.rev >= 0 ? { days: d.days, rev: d.rev } : null;
+
+  /** @param {object[]} Lraw local recents (newest first)  @param {object[]} R recents read from the file (strict-clean)  @param {string} cutoff oldest `last` still kept */
+  function mergeRecents(Lraw, R, cutoff) {
+    const L = new Map(), unsyncable = [];
+    Lraw.forEach((raw, i) => { try { const c = cleanRecent(raw, false); if (!L.has(c.id)) L.set(c.id, { raw, c, i }); else unsyncable.push(raw); } catch { unsyncable.push(raw); } });
+    const Rm = new Map(R.map((c, i) => [c.id, { c, i }])), items = [];
+    for (const id of new Set([...L.keys(), ...Rm.keys()])) {
+      const l = L.get(id), r = Rm.get(id);
+      let from = l ? 'l' : 'r';
+      if (l && r) from = l.c.last > r.c.last ? 'l' : l.c.last < r.c.last ? 'r' : (stableJson(l.c) >= stableJson(r.c) ? 'l' : 'r');
+      const clean = { ...(from === 'l' ? l.c : r.c), uses: Math.max(l?.c.uses || 0, r?.c.uses || 0) };
+      if (clean.last < cutoff) continue;
+      items.push({ clean, local: from === 'l' ? { ...l.raw, ...clean } : { ...clean }, ord: l ? l.i : 1e6 + r.i });
+    }
+    const dateDesc = (a, b) => a.clean.last < b.clean.last ? 1 : a.clean.last > b.clean.last ? -1 : 0;
+    const mine = items.slice().sort((a, b) => dateDesc(a, b) || a.ord - b.ord).slice(0, REC_MAX);
+    const file = items.slice().sort((a, b) => dateDesc(a, b) || (a.clean.id < b.clean.id ? -1 : 1)).slice(0, REC_MAX).map(x => x.clean);   // same order on every device
+    const before = [...L.values()].sort((a, b) => a.i - b.i).map(x => stableJson(x.c)), after = mine.map(x => stableJson(x.clean));
+    return { local: [...mine.map(x => x.local), ...unsyncable.filter(u => !(typeof u?.last === 'string') || u.last >= cutoff)], file,
+      localChanged: JSON.stringify(before) !== JSON.stringify(after),
+      remoteNeedsUpdate: JSON.stringify(file.map(stableJson)) !== JSON.stringify(R.map(stableJson)) };
+  }
+  /** The window setting: higher rev wins; the same rev with different days is decided by the larger number (same answer everywhere). */
+  function mergeRecentsDays(local, remote) {
+    const l = recDays(local) || { days: 30, rev: 0 }, r = recDays(remote);
+    let w = l; if (r && (r.rev > l.rev || (r.rev === l.rev && r.days > l.days))) w = r;
+    return { days: w.days, rev: w.rev, localChanged: w.days !== l.days || w.rev !== l.rev, remoteNeedsUpdate: w.rev > 0 && (!r || r.days !== w.days || r.rev !== w.rev) };
+  }
+
   /** Strictly parse the app-data JSON of settings.md. Returns {foods, favs, tombs} or {error}. */
   function readLibrary(data) {
-    const out = { foods: {}, favs: {}, tombs: { foods: {}, favs: {} } };
+    const out = { foods: {}, favs: {}, tombs: { foods: {}, favs: {} }, recents: [], days: null };
     if (data == null) return out;
     if (typeof data !== 'object' || Array.isArray(data)) return { error: 'app data must be an object' };
     const parts = [['customFoods', 'foods'], ['favorites', 'favs']];
@@ -191,6 +240,12 @@
         const arr = data[key]; if (arr == null) continue; if (!Array.isArray(arr)) throw new Error(key + ' must be a list');
         arr.forEach((it, i) => { try { const f = cleanFood(it, true); if (out[dst][f.id]) throw new Error('duplicate id ' + f.id); out[dst][f.id] = f; } catch (e) { throw new Error(`${key}[${i}]: ${e.message}`); } });
       }
+      if (data.recents != null) {
+        if (!Array.isArray(data.recents)) throw new Error('recents must be a list');
+        const ids = new Set();
+        data.recents.forEach((it, i) => { try { const f = cleanRecent(it, true); if (ids.has(f.id)) throw new Error('duplicate id ' + f.id); ids.add(f.id); out.recents.push(f); } catch (e) { throw new Error(`recents[${i}]: ${e.message}`); } });
+      }
+      if (data.recentsDays != null) { out.days = recDays(data.recentsDays); if (!out.days) throw new Error('recentsDays must be {days: 7|14|30|60|90, rev: whole number}'); }
       if (data.deleted != null) {
         if (typeof data.deleted !== 'object' || Array.isArray(data.deleted)) throw new Error('deleted must be an object');
         for (const [key, dst] of parts) { const m = data.deleted[key]; if (m == null) continue; if (typeof m !== 'object' || Array.isArray(m)) throw new Error(`deleted.${key} must be an object`);
@@ -222,19 +277,29 @@
   }
 
   /** @param {object} p { local:{foods,favs}, localTombs:{foods,favs}, remote:{foods,favs,tombs} (from readLibrary), now } */
-  function mergeLibrary({ local, localTombs = {}, remote, now = Date.now() }) {
+  function mergeLibrary({ local, localTombs = {}, remote, now = Date.now(), today = null }) {
     const a = mergeColl(local.foods || {}, localTombs.foods || {}, remote.foods, remote.tombs.foods, now);
     const b = mergeColl(local.favs || {}, localTombs.favs || {}, remote.favs, remote.tombs.favs, now);
+    // recents: only when the caller says what day it is (the window needs it)
+    let rc = null;
+    if (today) {
+      const dm = mergeRecentsDays(local.days, remote.days), cut = Recents.cutoff(today, dm.days);
+      rc = { dm, ...mergeRecents(local.recents || [], remote.recents || [], cut) };
+    }
     const list = m => Object.keys(m).sort().map(id => m[id]), revs = t => Object.fromEntries(Object.keys(t).sort().map(id => [id, t[id].rev]));
-    return { foods: a.local, favs: b.local, tombs: { foods: a.tombs, favs: b.tombs }, localChanged: a.localChanged || b.localChanged, remoteNeedsUpdate: a.remoteNeedsUpdate || b.remoteNeedsUpdate,
-      fileData: { customFoods: list(a.file), favorites: list(b.file), deleted: { customFoods: revs(a.tombs), favorites: revs(b.tombs) } } };
+    return { foods: a.local, favs: b.local, tombs: { foods: a.tombs, favs: b.tombs }, localChanged: a.localChanged || b.localChanged || !!(rc && (rc.localChanged || rc.dm.localChanged)),
+      remoteNeedsUpdate: a.remoteNeedsUpdate || b.remoteNeedsUpdate || !!(rc && (rc.remoteNeedsUpdate || rc.dm.remoteNeedsUpdate)),
+      recents: rc ? rc.local : local.recents, days: rc ? { days: rc.dm.days, rev: rc.dm.rev } : local.days,
+      fileData: { customFoods: list(a.file), favorites: list(b.file), ...(rc && rc.file.length ? { recents: rc.file } : {}), ...(rc && rc.dm.rev > 0 ? { recentsDays: { days: rc.dm.days, rev: rc.dm.rev } } : {}),
+        deleted: { customFoods: revs(a.tombs), favorites: revs(b.tombs) } } };
   }
   /** Fingerprint of the local library, to tell whether anything changed since the last sync. */
-  function libSig({ foods = {}, favs = {}, tombs = {} }) {
+  function libSig({ foods = {}, favs = {}, tombs = {}, recents = [], days = null }) {
     const part = m => Object.keys(m).sort().map(id => { try { const c = cleanFood({ ...m[id], id: m[id].id || id }, false); return [id, c.rev, libCanon(c)]; } catch { return [id, 0, '']; } });
     const tb = t => Object.keys(t || {}).sort().map(id => [id, t[id].rev]);
-    return stableJson({ f: part(foods), v: part(favs), tf: tb(tombs.foods), tv: tb(tombs.favs) });
+    const rec = recents.map(r => { try { return stableJson(cleanRecent(r, false)); } catch { return null; } }).filter(Boolean);
+    return stableJson({ f: part(foods), v: part(favs), tf: tb(tombs.foods), tv: tb(tombs.favs), ...(rec.length ? { r: rec } : {}), ...(days && days.rev > 0 ? { d: [days.days, days.rev] } : {}) });
   }
 
-  root.DayMerge = { mergeDay, makeBase, unionModels, canon, keyOf, cleanFood, readLibrary, mergeLibrary, libSig };
+  root.DayMerge = { mergeDay, makeBase, unionModels, canon, keyOf, cleanFood, readLibrary, mergeLibrary, libSig, mergeRecents, mergeRecentsDays, cleanRecent };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

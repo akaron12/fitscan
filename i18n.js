@@ -63,6 +63,7 @@ const EN = {
   'Nur aus Produkten mit Angaben von Open Food Facts.': 'Only from products with Open Food Facts data.',
   'Keine Mikronährstoff-Daten für diesen Tag. Gescannte Produkte liefern oft Werte wie Natrium, Calcium oder Vitamine.': 'No micronutrient data for this day. Scanned products often provide values like sodium, calcium or vitamins.',
   // Foods
+  'Meistbenutzt': 'Most used', 'Zuletzt-Liste behalten': 'Keep recents for', 'Lebensmittel der letzten Tage zum schnellen Wiederhinzufügen': 'Foods you logged lately, ready to add again', '{n} Tage': '{n} days',
   'Zuletzt': 'Recent', 'Favoriten': 'Favorites', 'Scans': 'Scans', 'Eigene': 'Custom', 'Gerichte': 'Recipes', 'Basis': 'Basics', 'Eigenes': 'Custom', 'Gericht': 'Recipe',
   'Hinzufügen zu': 'Add to', 'Lebensmittel oder Barcode': 'Food or barcode', 'Schnell hinzufügen': 'Quick add', 'Bibliothek & Eigene': 'Library & custom',
   'Hier erscheinen zuletzt eingetragene Lebensmittel.': 'Recently logged foods appear here.', 'Noch keine Favoriten. Tippe beim Lebensmittel auf den Stern.': 'No favorites yet. Tap the star on a food.',
