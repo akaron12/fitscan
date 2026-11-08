@@ -191,11 +191,22 @@ function customFoodSheet(f = null, code = '') {
     <div class="sec"><h4>${t('Nährwerte pro 100 g')}</h4></div>
     <div class="grid2">${field('cfK', t('Kalorien'), inputNum(n.kcal), { unit: 'kcal' })}${field('cfP', t('Protein'), inputNum(n.p), { unit: 'g' })}${field('cfC', t('Kohlenhydrate'), inputNum(n.c), { unit: 'g' })}${field('cfF', t('Fett'), inputNum(n.f), { unit: 'g' })}
       ${field('cfS', t('Zucker'), inputNum(n.sug), { unit: 'g' })}${field('cfB', t('Ballaststoffe'), inputNum(n.fib), { unit: 'g' })}${field('cfSa', t('Salz'), inputNum(n.salt), { unit: 'g' })}${field('cfServ', t('Portion'), inputNum(f?.serving?.g), { unit: 'g' })}</div>
+    <p class="hint" id="cfHint"></p>
     <button class="btn block" id="cfSave">${t('Speichern')}</button>${f ? `<button class="btn plain danger-text block" id="cfDel">${t('Löschen')}</button>` : ''}</div>`, () => {
     if (!f) setTimeout(() => $('#cfName')?.focus(), 250);
+    // Calories ARE the macros (4/4/9): the calories box is calculated and read-only, and Save refuses macros that cannot be right (macros.js).
+    const v = id => num($('#' + id).value, 0, id === 'cfK' ? 900 : id === 'cfServ' ? 5000 : 100);
+    const macros = () => ({ kcal: v('cfK'), p: v('cfP'), c: v('cfC'), f: v('cfF') }), calc = () => Macros.kcal(v('cfP'), v('cfC'), v('cfF'));
+    const problem = bad => bad.kind === 'sum' ? t('Protein, Kohlenhydrate und Fett dürfen zusammen höchstens 100 g pro 100 g ergeben (jetzt {t} g).', { t: de(bad.total, 1) }) : t('Die Kalorien müssen zu den Makros passen: sie ergeben {k} kcal (4/4/9).', { k: de(bad.calc) });
+    const hint = () => { const bad = Macros.check(macros()), h = $('#cfHint'); h.textContent = bad ? problem(bad) : calc() ? t('Kalorien werden aus den Makros berechnet (4/4/9).') : ''; h.classList.toggle('warn', !!bad); };
+    const follow = () => { const k = calc(); $('#cfK').value = k ? String(k) : '0'; hint(); };
+    $('#cfK').readOnly = true; $('#cfK').setAttribute('aria-readonly', 'true');
+    ['cfP', 'cfC', 'cfF'].forEach(id => { $('#' + id).oninput = follow; });
+    follow();
     $('#cfSave').onclick = () => {
       const name = $('#cfName').value.trim(); if (!name) return toast(t('Bitte Namen eingeben'));
-      const v = id => num($('#' + id).value, 0, id === 'cfK' ? 900 : id === 'cfServ' ? 5000 : 100);
+      follow();                                                                       // calories always come from the macros
+      const bad = Macros.check(macros()); if (bad) { hint(); return toast(problem(bad)); }
       const id = f?.id || 'cust:' + (code || uid());
       const food = { id, src: 'custom', code: code || f?.code || '', name, brand: $('#cfBrand').value.trim(), cat: 'Eigene', n: { kcal: v('cfK'), p: v('cfP'), c: v('cfC'), f: v('cfF'), sug: v('cfS'), fib: v('cfB'), salt: v('cfSa') }, serving: v('cfServ') ? { g: v('cfServ'), label: 'Portion' } : null };
       saveCustomFood(food);

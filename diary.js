@@ -88,7 +88,7 @@ function deleteEntry(date, e) {
 }
 
 // ---------- Quick add ----------
-const macroKcal = (p, c, f) => Math.round(p * 4 + c * 4 + f * 9);   // 4/4/9 kcal per gram
+const macroKcal = (p, c, f) => Macros.kcal(p, c, f);   // 4/4/9 kcal per gram (macros.js)
 const macroGridHtml = (n = {}) => `<div class="grid2">${field('qaP', t('Protein'), inputNum(n.p), { unit: 'g' })}${field('qaC', t('Kohlenhydrate'), inputNum(n.c), { unit: 'g' })}${field('qaF', t('Fett'), inputNum(n.f), { unit: 'g' })}${field('qaK', t('Kalorien'), inputNum(n.kcal), { unit: 'kcal' })}</div><p class="hint" id="qaHint"></p>`;
 /** Wires the protein/carbs/fat/kcal fields of macroGridHtml: kcal follows the macros (4/4/9) until the user types their own
     value; clearing the kcal field makes it automatic again. vals() returns the numbers (kcal falls back to the macro sum). */
