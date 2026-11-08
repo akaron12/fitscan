@@ -9,8 +9,10 @@
   const TYPES = 'Foundation,SR Legacy,Survey (FNDDS)';
   const round1 = x => Math.round((+x || 0) * 10) / 10;
 
-  const getKey = () => { try { return (localStorage.getItem(KEY_STORE) || '').trim(); } catch { return ''; } };
-  const setKey = k => { try { k && k.trim() ? localStorage.setItem(KEY_STORE, k.trim()) : localStorage.removeItem(KEY_STORE); } catch {} };
+  /** A key never contains whitespace. .trim() misses invisible characters that a phone paste can bring (zero-width space, word joiner, BOM), so strip them all, anywhere in the key. */
+  const cleanKey = k => String(k == null ? '' : k).replace(/[\s\u200B-\u200D\u2060\uFEFF]/g, '');
+  const getKey = () => { try { return cleanKey(localStorage.getItem(KEY_STORE)); } catch { return ''; } };
+  const setKey = k => { try { const c = cleanKey(k); c ? localStorage.setItem(KEY_STORE, c) : localStorage.removeItem(KEY_STORE); } catch {} };
 
   /** One search hit -> app food (per 100 g), or null if it has no usable nutrition. */
   function parse(item) {
@@ -39,11 +41,11 @@
     try { res = await doFetch(urlFor(q, key), { signal }); }
     catch (e) { if (e && e.name === 'AbortError') throw e; throw err('network', 'USDA is not reachable'); }
     if (res.status === 429) throw err('rate', 'USDA rate limit reached (about 1,000 searches per hour per key)');
-    if (res.status === 400 || res.status === 401 || res.status === 403) throw err('key', 'USDA rejected the API key');
+    if (res.status === 401 || res.status === 403) throw err('key', 'USDA rejected the API key');
     if (!res.ok) throw err('http', 'USDA error ' + res.status);
     const j = await res.json(), seen = new Set(), out = [];
     for (const it of j.foods || []) { const f = parse(it); if (f && !seen.has(f.id)) { seen.add(f.id); out.push(f); } }
     return out;
   }
-  root.USDA = { getKey, setKey, parse, search, urlFor, KEY_STORE };
+  root.USDA = { getKey, setKey, cleanKey, parse, search, urlFor, KEY_STORE };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

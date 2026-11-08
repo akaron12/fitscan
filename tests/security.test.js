@@ -8,7 +8,7 @@ const eq = (a, b, msg) => { const A = JSON.stringify(a), B = JSON.stringify(b); 
 const ok = (c, msg) => eq(!!c, true, msg);
 
 const html = read('index.html'), sw = read('sw.js');
-const APP_JS = ['i18n.js', 'icons.js', 'core.js', 'ui.js', 'usda.js', 'diary.js', 'food.js', 'progress.js', 'settings.js', 'dayfile.js', 'merge.js', 'driveclient.js', 'driveauth.js', 'sync.js', 'syncapp.js', 'sw.js'];
+const APP_JS = ['i18n.js', 'icons.js', 'core.js', 'ui.js', 'usda.js', 'swipe.js', 'diary.js', 'food.js', 'progress.js', 'settings.js', 'dayfile.js', 'merge.js', 'driveclient.js', 'driveauth.js', 'sync.js', 'syncapp.js', 'sw.js'];
 
 // ---- 1. CSP ----
 const cspM = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html); ok(cspM, 'index.html has a Content-Security-Policy meta tag');
@@ -30,6 +30,10 @@ ok(allowed.includes('https://images.openfoodfacts.org'), 'product images host al
 const inlineScripts = (html.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []); eq(inlineScripts, [], 'no inline <script> in index.html');
 ok(!/\son[a-z]+\s*=\s*["']/i.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'no inline event handler attributes in index.html');
 for (const f of APP_JS) { const src = read(f); ok(!/\son(click|error|load|input|change|submit|mouse[a-z]+|key[a-z]+|focus|blur)\s*=\s*["'\\]/i.test(src.replace(/\.on[a-z]+\s*=\s*/g, '')), `${f}: no inline on*= handler in HTML strings`); ok(!/javascript:/i.test(src), `${f}: no javascript: URLs`); ok(!/\beval\s*\(|new Function\s*\(/.test(src), `${f}: no eval / new Function`); ok(!/document\.write/.test(src), `${f}: no document.write`); }
+
+// A key handler must never return false: browsers read that as "cancel the keypress", which silently blocks typing (this hit the quantity
+// box on iPhone: `qi.onkeydown = e => e.key === 'Enter' && save()` returns false for every other key). Use a block body: `e => { if (...) ... }`.
+for (const f of APP_JS) { const bad = [...read(f).matchAll(/\.on(key(?:down|up|press))\s*=\s*(?:\([^)]*\)|\w+)\s*=>(?!\s*\{)[^\n;]*/g)].map(m => m[0].slice(0, 80)); eq(bad, [], `${f}: key handlers use a block body (an expression body can return false and cancel typing)`); }
 
 // ---- 3. service worker cache list vs index.html ----
 const shell = eval(/const SHELL = (\[[^\]]*\])/.exec(sw)[1]);
