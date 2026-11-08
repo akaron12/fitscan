@@ -7,14 +7,15 @@ const SyncApp = (() => {
   const drive = DriveClient.create({ fetch: (...a) => fetch(...a), getToken: DriveAuth.getToken, store: DriveClient.localStore('fitscan.drive.') });
   const specText = async () => { const r = await fetch('docs/FORMAT.md', { cache: 'no-cache' }); return r.ok ? r.text() : null; };
   const engine = Sync.create({ drive, getS: () => S, persist: () => save(true), uid, today, specText });
-  let timer = null, oldDaysAsked = new Set();
+  let timer = null, oldDaysAsked = new Set(), redrawLater = false;
+  window.onSheetClosed = () => { if (redrawLater) { redrawLater = false; rerender(); } };
 
   // ---------- running a sync ----------
   async function sync(reason) {
     if (!DriveAuth.getToken()) { paint(); return null; }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) { paint(); return null; }
     const r = await engine.syncNow({ visibleDate: ui.date });
-    if ((r?.pulled || /pulled|merged/.test(r?.library || '')) && !sheetOpen()) rerender();
+    if (r?.changed) { if (sheetOpen()) redrawLater = true; else rerender(); }   // a redraw skipped because a sheet is open runs when it closes (window.onSheetClosed)
     paint(); refreshCard();
     return r;
   }

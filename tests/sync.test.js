@@ -53,6 +53,19 @@ test('after a storage wipe: pull-only hydrate, nothing is written, old days outs
   eq(d.count(WRITE), writesBefore, 'hydrate wrote nothing'); eq(entriesOf(b, TODAY).length + entriesOf(b, YEST).length + entriesOf(b, '2026-10-01').length, 3, 'recent days restored'); eq(entriesOf(b, '2025-01-01').length, 0, 'ancient day not pulled');
   ok(b.S.sync.synced, 'marker set after the pull');
 });
+test('changed flag (drives the screen redraw): set on a first sync that pulls days, on adopted goals and on pulled foods; quiet otherwise', async () => {
+  const d = setup(), a = device(d, { name: 'A' }); eat(a, TODAY, { food: 'Oats' }); a.S.goals = { kcal: 2400, p: 160, c: 250, f: 80, manual: true, rev: 1 };
+  a.S.foods['cust:bowl'] = { id: 'cust:bowl', name: 'Bowl', n: { kcal: 100, p: 5, c: 10, f: 2 }, rev: 1 };
+  let r = await a.eng.syncNow({ visibleDate: TODAY }); ok(r.ok, 'A ok'); eq(r.changed, false, 'pushing only is not a change on screen');
+  const b = device(d, { name: 'B' }); r = await b.eng.syncNow({ visibleDate: TODAY }); ok(r.ok, 'B ok');
+  eq([r.changed, r.pulled > 0, r.goals, r.library], [true, true, 'adopted', 'pulled'], 'fresh device: meals, goals and foods all pulled => changed (first sync used to report pulled 0)');
+  r = await b.eng.syncNow({ visibleDate: TODAY }); eq(r.changed, false, 'nothing new => not changed');
+  const f = [...d.files.values()].find(x => x.name === 'settings.md'); f.content = f.content.replace('kcal: 2400', 'kcal: 2300'); f.modifiedTime = '2031-01-01T00:00:00.000Z';
+  r = await b.eng.syncNow({ visibleDate: TODAY }); eq([r.goals, r.changed, b.S.goals.kcal], ['adopted', true, 2300], 'goals changed in Drive => changed');
+  const d2 = setup(), c = device(d2, { name: 'C' }); eat(c, TODAY, { food: 'Eggs' }); await c.eng.syncNow({ visibleDate: TODAY }); const re = remoteEntries(d2, TODAY);
+  claudeWrites(d2, TODAY, remoteFile(d2, TODAY).content.replace('food: Eggs', 'food: Omelette')); r = await c.eng.syncNow({ visibleDate: TODAY });
+  eq([r.changed, c.eng.status().suggestions], [true, 1], 'an outside edit of an eaten entry becomes a suggestion => changed'); ok(re.length === 1, 'sanity');
+});
 test('first sync with existing local data and a different remote day: nothing is lost either way', async () => {
   const d = setup(), a = device(d); await a.eng.syncNow(); claudeWrites(d, TODAY, DayFile.serialize(DayFile.create(TODAY, [fe({ id: 'r1', food: 'Remote' })])));
   const b = device(d, { name: 'b' }); eat(b, TODAY, { food: 'Local' }); await b.eng.syncNow({ visibleDate: TODAY });
