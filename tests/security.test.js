@@ -31,6 +31,10 @@ const inlineScripts = (html.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []); eq(in
 ok(!/\son[a-z]+\s*=\s*["']/i.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'no inline event handler attributes in index.html');
 for (const f of APP_JS) { const src = read(f); ok(!/\son(click|error|load|input|change|submit|mouse[a-z]+|key[a-z]+|focus|blur)\s*=\s*["'\\]/i.test(src.replace(/\.on[a-z]+\s*=\s*/g, '')), `${f}: no inline on*= handler in HTML strings`); ok(!/javascript:/i.test(src), `${f}: no javascript: URLs`); ok(!/\beval\s*\(|new Function\s*\(/.test(src), `${f}: no eval / new Function`); ok(!/document\.write/.test(src), `${f}: no document.write`); }
 
+// A key handler must never return false: browsers read that as "cancel the keypress", which silently blocks typing (this hit the quantity
+// box on iPhone: `qi.onkeydown = e => e.key === 'Enter' && save()` returns false for every other key). Use a block body: `e => { if (...) ... }`.
+for (const f of APP_JS) { const bad = [...read(f).matchAll(/\.on(key(?:down|up|press))\s*=\s*(?:\([^)]*\)|\w+)\s*=>(?!\s*\{)[^\n;]*/g)].map(m => m[0].slice(0, 80)); eq(bad, [], `${f}: key handlers use a block body (an expression body can return false and cancel typing)`); }
+
 // ---- 3. service worker cache list vs index.html ----
 const shell = eval(/const SHELL = (\[[^\]]*\])/.exec(sw)[1]);
 const loaded = [...html.matchAll(/<script[^>]+src="([^"]+)"/g), ...html.matchAll(/<link[^>]+href="([^"]+)"/g)].map(m => m[1]).filter(u => !/^https?:/.test(u));

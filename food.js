@@ -162,7 +162,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
     const live = () => { const n = nutr(food, grams());
       $('#fsLive').innerHTML = `<div class="live-k"><b>${de(n.kcal)}</b><span>kcal</span></div><div class="live-m">${MACROS.map(([k, l]) => `<span><i class="dot" style="background:var(--${k})"></i>${t(l)} <b>${de(n[k], 1)} g</b></span>`).join('')}</div>`; };
     qi.oninput = live;
-    qi.onkeydown = e => e.key === 'Enter' && $('#fsSave').click();
+    qi.onkeydown = e => { if (e.key === 'Enter') $('#fsSave').click(); };   // never return false from a key handler: browsers treat that as "cancel the keypress" and nothing can be typed
     ui2.onchange = () => { const u = ui2.value; qi.value = u === 'g' || u === 'ml' ? r0(food.serving?.g || 100) : 1; live(); };
     live();
     $$('[data-pi]', sh).forEach(b => b.onclick = () => { const p = presets[+b.dataset.pi]; if (units.some(u => u[0] === p[1])) ui2.value = p[1]; qi.value = inputNum(p[2]); live(); $$('[data-pi]', sh).forEach(x => x.classList.toggle('on', x === b)); });
@@ -319,7 +319,7 @@ function manualBarcode() {
   openSheet(`${sheetHead(t('Barcode eingeben'), t('Die Ziffern unter dem Strichcode (EAN/UPC, 8–13 Stellen).'))}
     <div class="form">${field('mbCode', t('Barcode'), '', { ph: '4000417025005', mode: 'numeric' })}<button class="btn block" id="mbGo">${t('Produkt suchen')}</button></div>`, () => {
     const goFn = () => { const c = $('#mbCode').value.replace(/\D/g, ''); if (c.length < 6) return toast(t('Ungültiger Code')); handleBarcode(c); };
-    $('#mbGo').onclick = goFn; $('#mbCode').onkeydown = e => e.key === 'Enter' && goFn(); setTimeout(() => $('#mbCode')?.focus(), 250);
+    $('#mbGo').onclick = goFn; $('#mbCode').onkeydown = e => { if (e.key === 'Enter') goFn(); }; setTimeout(() => $('#mbCode')?.focus(), 250);
   });
 }
 async function handleBarcode(code) {

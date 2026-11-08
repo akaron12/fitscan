@@ -45,7 +45,7 @@ function renderDiary(v) {
   $$('[data-day]', v).forEach(b => b.onclick = () => { ui.date = b.dataset.day; render(); });
   if ($('#setupBanner')) $('#setupBanner').onclick = goalsSheet;
   $('#sum').onclick = () => dayDetailSheet(d);
-  $('#sum').onkeydown = e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), dayDetailSheet(d));
+  $('#sum').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dayDetailSheet(d); } };
   if ($('#copyDay')) $('#copyDay').onclick = () => copyEntries(S.entries[addDays(d, -1)], d);
   $$('[data-add]', v).forEach(b => b.onclick = () => go('library', { targetMeal: b.dataset.add, query: '' }));
   $$('[data-copy]', v).forEach(b => b.onclick = () => copyEntries((S.entries[addDays(d, -1)] || []).filter(e => e.meal === b.dataset.copy), d));
