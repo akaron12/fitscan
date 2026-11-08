@@ -21,6 +21,11 @@ f = USDA.parse({ fdcId: 2, description: 'Mystery', foodNutrients: [N(1003, 10), 
 eq(USDA.parse({ fdcId: 3, description: 'No nutrients', foodNutrients: [] }), null, 'no nutrition => dropped'); eq(USDA.parse({ description: 'No id' }), null, 'no id => dropped'); eq(USDA.parse(null), null, 'null');
 ok(USDA.urlFor('chicken breast', 'KEY123').includes('api_key=KEY123') && USDA.urlFor('chicken breast', 'K').includes('query=chicken%20breast') && USDA.urlFor('x', 'K').includes('dataType=Foundation%2CSR%20Legacy%2CSurvey%20(FNDDS)'), 'url built and escaped');
 
+// A pasted key: normal spaces, tabs/newlines, non-breaking space, zero-width space/joiners, word joiner and BOM are all removed, anywhere in the key
+eq(USDA.cleanKey(' ​AbC123 \n\t'), 'AbC123', 'leading/trailing whitespace and invisible characters stripped');
+eq(USDA.cleanKey('Ab C‍1⁠2﻿3'), 'AbC123', 'whitespace and invisible characters inside the key stripped');
+eq([USDA.cleanKey(null), USDA.cleanKey(undefined), USDA.cleanKey('   ')], ['', '', ''], 'empty input gives an empty key');
+
 const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
 const run = async () => {
   let called = null; const good = async (url, o) => { called = url; return resp(200, { foods: [chicken, chicken, { fdcId: 9, description: 'junk' }] }); };
@@ -28,7 +33,7 @@ const run = async () => {
   const kind = async (deps, k, msg) => { try { await USDA.search('x', null, deps); failed++; print('FAIL: ' + msg + ' (no error)'); } catch (e) { eq(e.kind, k, msg); } };
   await kind({ key: '', fetch: good }, 'nokey', 'no key');
   await kind({ key: 'K', fetch: async () => resp(429, {}) }, 'rate', '429 => rate');
-  await kind({ key: 'K', fetch: async () => resp(403, {}) }, 'key', '403 => key'); await kind({ key: 'K', fetch: async () => resp(400, {}) }, 'key', '400 => key');
+  await kind({ key: 'K', fetch: async () => resp(403, {}) }, 'key', '403 => key'); await kind({ key: 'K', fetch: async () => resp(401, {}) }, 'key', '401 => key'); await kind({ key: 'K', fetch: async () => resp(400, {}) }, 'http', '400 => http (not blamed on the key)');
   await kind({ key: 'K', fetch: async () => resp(500, {}) }, 'http', '500 => http'); await kind({ key: 'K', fetch: async () => { throw new TypeError('Failed to fetch'); } }, 'network', 'offline => network');
   try { await USDA.search('x', null, { key: 'K', fetch: async () => { const e = new Error('aborted'); e.name = 'AbortError'; throw e; } }); failed++; } catch (e) { eq(e.name, 'AbortError', 'abort passes through untouched'); }
   eq(USDA.getKey(), '', 'no key without localStorage');
