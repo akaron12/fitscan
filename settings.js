@@ -11,6 +11,9 @@ function renderProfile(v) {
   <div class="sec"><h4>${t('Ziele')}</h4></div>
   <div class="card list">${navRow('pGoals', 'target', t('Tagesziele anpassen'), t('Kalorien und Makros manuell festlegen'))}</div>
 
+  <div class="sec"><h4>${t('Zuletzt')}</h4></div>
+  <div class="card list"><label class="row-item"><span class="grow"><span class="nm">${t('Zuletzt-Liste behalten')}</span><span class="sub">${t('Lebensmittel der letzten Tage zum schnellen Wiederhinzufügen')}</span></span><select class="mini-select" id="sRecents" aria-label="${t('Zuletzt-Liste behalten')}">${Recents.DAYS.map(d => `<option value="${d}" ${d === st.recentsDays ? 'selected' : ''}>${t('{n} Tage', { n: d })}</option>`).join('')}</select></label></div>
+
   <div class="sec"><h4>${t('Scanner')}</h4></div>
   <div class="card list">${switchRow('sBeep', t('Ton beim Scannen'), st.beep)}${switchRow('sCont', t('Serienscan'), st.continuousScan, t('Produkte direkt hinzufügen, Kamera bleibt offen'))}</div>
 
@@ -42,6 +45,7 @@ function renderProfile(v) {
   };
   const sv = () => { st.beep = $('#sBeep').checked; st.continuousScan = $('#sCont').checked; save(); };
   $$('#sBeep,#sCont', v).forEach(i => i.onchange = sv);
+  $('#sRecents').onchange = e => { setRecentsDays(+e.target.value); toast(t('Gespeichert')); };
   bindSeg(v, 'sTheme', th => { st.theme = th; save(); applyTheme(); });
   $('#exJson').onclick = () => download(`fitscan-backup-${today()}.json`, JSON.stringify({ app: 'fitscan', version: 4, exported: new Date().toISOString(), data: S }, null, 1), 'application/json');
   $('#exCsv').onclick = () => {

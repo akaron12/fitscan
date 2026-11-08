@@ -44,8 +44,9 @@
   /** One item per line keeps the file readable (and diffs small); unknown top-level keys of an existing block are kept. */
   function stringifyData(d, old) {
     const items = a => a.length ? '\n' + a.map(x => '  ' + JSON.stringify(x)).join(',\n') + '\n ' : '';
-    const extras = old && typeof old === 'object' && !Array.isArray(old) ? Object.keys(old).filter(k => !['customFoods', 'favorites', 'deleted'].includes(k)) : [];
-    return ['{', ` "customFoods": [${items(d.customFoods)}],`, ` "favorites": [${items(d.favorites)}],`, ` "deleted": ${JSON.stringify(d.deleted)}${extras.length ? ',' : ''}`,
+    const extras = old && typeof old === 'object' && !Array.isArray(old) ? Object.keys(old).filter(k => !['customFoods', 'favorites', 'recents', 'recentsDays', 'deleted'].includes(k)) : [];
+    return ['{', ` "customFoods": [${items(d.customFoods)}],`, ` "favorites": [${items(d.favorites)}],`, ...(d.recents?.length ? [` "recents": [${items(d.recents)}],`] : []),
+      ...(d.recentsDays ? [` "recentsDays": ${JSON.stringify(d.recentsDays)},`] : []), ` "deleted": ${JSON.stringify(d.deleted)}${extras.length ? ',' : ''}`,
       ...extras.map((k, i) => ` ${JSON.stringify(k)}: ${JSON.stringify(old[k])}${i < extras.length - 1 ? ',' : ''}`), '}'].join('\n');
   }
   /** goals: object or null (no goals block is written then). data: library data to write, or undefined to leave the json block as it is. */
@@ -143,7 +144,7 @@
     }
 
     // ---------- settings.md: goals + custom foods + favorites, read, merged and written in one pass ----------
-    const libOf = () => { const s = S(); return { foods: s.foods ||= {}, favs: s.favorites ||= {}, tombs: s.libTombs ||= { foods: {}, favs: {} } }; };
+    const libOf = () => { const s = S(), set = s.settings ||= {}; return { foods: s.foods ||= {}, favs: s.favorites ||= {}, tombs: s.libTombs ||= { foods: {}, favs: {} }, recents: s.recents ||= [], days: { days: set.recentsDays || 30, rev: set.recentsRev || 0 } }; };
     const EMPTY_SIG = DayMerge.libSig({ foods: {}, favs: {}, tombs: {} });
     const libDirty = () => !info.blocked['settings.md'] && DayMerge.libSig(libOf()) !== (st().libSyncedSig ?? EMPTY_SIG);
     async function syncSettings(folderId) {
@@ -163,9 +164,9 @@
         if (rl.error) { info.blocked['settings.md'] = rl.error; info.warnings.push(`settings.md: custom foods and favorites are not synced (${rl.error})`); out.library = 'unreadable'; }
         else {
           delete info.blocked['settings.md'];
-          const lib = libOf(), res = DayMerge.mergeLibrary({ local: { foods: lib.foods, favs: lib.favs }, localTombs: lib.tombs, remote: rl, now: now() });
-          if (res.localChanged) { S().foods = res.foods; S().favorites = res.favs; S().libTombs = res.tombs; persist(); out.library = 'pulled'; }
-          const d = res.fileData, any = d.customFoods.length || d.favorites.length || Object.keys(d.deleted.customFoods).length || Object.keys(d.deleted.favorites).length;
+          const lib = libOf(), res = DayMerge.mergeLibrary({ local: { foods: lib.foods, favs: lib.favs, recents: lib.recents, days: lib.days }, localTombs: lib.tombs, remote: rl, now: now(), today: today() });
+          if (res.localChanged) { S().foods = res.foods; S().favorites = res.favs; S().libTombs = res.tombs; S().recents = res.recents; S().settings.recentsDays = res.days.days; S().settings.recentsRev = res.days.rev; persist(); out.library = 'pulled'; }
+          const d = res.fileData, any = d.customFoods.length || d.favorites.length || d.recents?.length || d.recentsDays || Object.keys(d.deleted.customFoods).length || Object.keys(d.deleted.favorites).length;
           if (any || rm?.hasData) data = d;
           if (res.remoteNeedsUpdate) { needWrite = true; out.library = out.library === 'pulled' ? 'merged' : 'pushed'; }
           else if (out.library === 'skipped') out.library = 'unchanged';
