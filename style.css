@@ -152,6 +152,7 @@ main > .btn.block { margin-bottom: 12px; }
 .field-in { display: flex; align-items: center; gap: 6px; height: 48px; padding: 0 14px; border-radius: 12px; background: var(--fill); transition: box-shadow .15s; }
 .field-in:focus-within { box-shadow: inset 0 0 0 1.5px var(--acc); }
 .field-in input, .field-in select { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; font-size: 16px; appearance: none; -webkit-appearance: none; }
+.field-in input[readonly] { color: var(--mut); }
 .field-in em { font-style: normal; font-size: 14px; color: var(--mut); }
 .input { width: 100%; height: 48px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--fill); font-size: 16px; outline: none; }
 .input:focus { box-shadow: inset 0 0 0 1.5px var(--acc); }
