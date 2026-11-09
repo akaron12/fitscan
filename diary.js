@@ -20,7 +20,8 @@ function renderDiary(v) {
   if (!S.goals.manual) html += `<button class="card banner" id="setupBanner"><span class="banner-ic">${I('target')}</span><span class="grow"><b>${t('Ziele festlegen')}</b><span class="sub">${t('Kalorien- und Makroziele eintragen')}</span></span>${I('chevR', 'chev')}</button>`;
 
   const mrow = (k, l) => { const over = tt[k] > g[k] * 1.05;
-    return `<div class="mrow"><div class="lbl"><span>${t(l)}</span><span class="val${over ? ' over' : ''}"><b>${r0(tt[k])}</b> / ${g[k]} g</span></div><div class="bar"><i style="width:${Math.min(100, g[k] ? tt[k] / g[k] * 100 : 0)}%;background:var(--${k})"></i></div></div>`; };
+    const net = k === 'c' ? ` <span class="sub-nc">(${t('Netto {n}', { n: r0(tt.nc) })})</span>` : '';
+    return `<div class="mrow"><div class="lbl"><span>${t(l)}</span><span class="val${over ? ' over' : ''}"><b>${r0(tt[k])}</b>${net} / ${g[k]} g</span></div><div class="bar"><i style="width:${Math.min(100, g[k] ? tt[k] / g[k] * 100 : 0)}%;background:var(--${k})"></i></div></div>`; };
   html += `<section class="card summary" id="sum" role="button" tabindex="0">
     <div class="sum-top"><div class="ring">${ring(tt.kcal, g.kcal, 140, 13)}<div class="center"><span class="big">${de(Math.abs(rest))}</span><span class="sub">${rest >= 0 ? t('kcal übrig') : t('kcal drüber')}</span></div></div>
     <div class="macros">${MACROS.map(([k, l]) => mrow(k, l)).join('')}</div></div>
@@ -57,7 +58,8 @@ function renderDiary(v) {
 }
 function entryRow(e) {
   const n = nutr(e.food, e.g), planned = !isEaten(e), note = e.x?.note ? ` · ${esc(e.x.note)}` : '', pend = e.food.src === 'pending';
-  return `<div class="row-item entry${planned ? ' planned' : ''}" data-eid="${esc(e.id)}" data-del="${t('Löschen')}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${planned ? `<span class="plan-tag">${t('Geplant')}</span> ` : ''}${pend ? `<span class="plan-tag">${e.pending?.notFound ? t('Nicht gefunden') : '⏳ ' + t('Wartet auf Netz')}</span> ` : ''}${esc(entryLabel(e))} · P ${r0(n.p)} · ${t('K')} ${r0(n.c)} · F ${r0(n.f)}${note}</div></div><div class="kcal">${de(n.kcal)}</div>${planned ? `<button class="chk" data-chk="${esc(e.id)}" aria-label="${t('Als gegessen bestätigen')}" title="${t('Als gegessen bestätigen')}">${I('check')}</button>` : ''}</div>`;
+  const cTxt = r0(n.c) > 0 ? `${t('K')} ${r0(n.c)} (${t('NC')} ${r0(n.nc)})` : `${t('K')} 0`;
+  return `<div class="row-item entry${planned ? ' planned' : ''}" data-eid="${esc(e.id)}" data-del="${t('Löschen')}">${foodIcon(e.food)}<div class="grow"><div class="nm">${esc(e.food.name)}</div><div class="sub">${planned ? `<span class="plan-tag">${t('Geplant')}</span> ` : ''}${pend ? `<span class="plan-tag">${e.pending?.notFound ? t('Nicht gefunden') : '⏳ ' + t('Wartet auf Netz')}</span> ` : ''}${esc(entryLabel(e))} · P ${r0(n.p)} · ${cTxt} · F ${r0(n.f)}${note}</div></div><div class="kcal">${de(n.kcal)}</div>${planned ? `<button class="chk" data-chk="${esc(e.id)}" aria-label="${t('Als gegessen bestätigen')}" title="${t('Als gegessen bestätigen')}">${I('check')}</button>` : ''}</div>`;
 }
 /** Eaten totals drive the ring; planned meals only show as a projection. */
 function projLine(tt, pt, g) {
@@ -152,7 +154,7 @@ function dayDetailSheet(d) {
     <div class="card"><div class="macrobar">${MACROS.map(([k]) => `<i style="width:${kc[k] / tot * 100}%;background:var(--${k})"></i>`).join('')}</div>
     <div class="legend">${MACROS.map(([k, l]) => `<span><i class="dot" style="background:var(--${k})"></i>${t(l)} <b>${r0(kc[k] / tot * 100)} %</b></span>`).join('')}</div></div>
     <div class="sec"><h4>${t('Nährwerte')}</h4></div>
-    <div class="card list">${row(t('Energie'), de(tt.kcal) + ' kcal', de(g.kcal) + ' kcal')}${row(t('Protein'), r0(tt.p) + ' g', g.p + ' g')}${row(t('Kohlenhydrate'), r0(tt.c) + ' g', g.c + ' g')}${row(t('davon Zucker'), r0(tt.sug) + ' g', '< 50 g')}${row(t('Fett'), r0(tt.f) + ' g', g.f + ' g')}${row(t('Ballaststoffe'), r0(tt.fib) + ' g', '≥ 30 g')}${row(t('Salz'), de(tt.salt, 1) + ' g', '< 6 g')}</div>
+    <div class="card list">${row(t('Energie'), de(tt.kcal) + ' kcal', de(g.kcal) + ' kcal')}${row(t('Protein'), r0(tt.p) + ' g', g.p + ' g')}${row(t('Kohlenhydrate'), r0(tt.c) + ' g', g.c + ' g')}${row(t('davon Zucker'), r0(tt.sug) + ' g', '< 50 g')}${row(t('Netto-Kohlenhydrate'), r0(tt.nc) + ' g')}${row(t('Fett'), r0(tt.f) + ' g', g.f + ' g')}${row(t('Ballaststoffe'), r0(tt.fib) + ' g', '≥ 30 g')}${row(t('Salz'), de(tt.salt, 1) + ' g', '< 6 g')}</div>
     <div class="sec"><h4>${t('Mikronährstoffe')}</h4></div>
     ${Object.keys(mic).length ? `<div class="card list">${MICROS.filter(m => mic[m[0]]).map(([k, l, u, f]) => `<div class="row-item"><span class="grow">${t(l)}</span><span class="sub">${t('{a} von {b} Einträgen', { a: cover[k], b: es.length })}</span><b class="row-val">${de(mic[k] * f, u === 'g' ? 1 : 0)} ${u}</b></div>`).join('')}</div>
       <p class="hint">${t('Nur aus Produkten mit Angaben von Open Food Facts.')}</p>` : `<p class="hint">${t('Keine Mikronährstoff-Daten für diesen Tag. Gescannte Produkte liefern oft Werte wie Natrium, Calcium oder Vitamine.')}</p>`}`, sh => {

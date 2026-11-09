@@ -141,7 +141,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
   if (food.serving?.g) presets.push(['½', 'serv', 0.5], ['1×', 'serv', 1], ['2×', 'serv', 2]);
   presets.push(['50 g', 'g', 50], ['100 g', 'g', 100], ['150 g', 'g', 150], ['200 g', 'g', 200]);
   const editable = S.recipes[food.id] ? 'recipe' : S.foods[food.id] ? 'custom' : null;
-  const sv = food.serving?.g ? nutr(food, food.serving.g) : null, n100 = food.n || {};
+  const sv = food.serving?.g ? nutr(food, food.serving.g) : null, n100 = { ...food.n, nc: Math.max(0, (+food.n?.c || 0) - (+food.n?.fib || 0)) };
   const nrow = (l, k, u, dd, cls = '') => `<div class="row-item${cls}"><span class="grow">${l}</span><span class="row-val">${de(n100[k] || 0, dd)} ${u}</span>${sv ? `<span class="row-val">${de(sv[k], dd)} ${u}</span>` : ''}</div>`;
   const micros = food.micro ? MICROS.filter(m => food.micro[m[0]]).map(([k, l, u, f]) => `<div class="row-item micro"><span class="grow">${t(l)}</span><span class="row-val">${de(food.micro[k] * f, 1)} ${u}</span>${sv ? `<span class="row-val">${de(food.micro[k] * f * food.serving.g / 100, 1)} ${u}</span>` : ''}</div>`).join('') : '';
   const badges = food.ns || food.nova ? `<div class="badges">${nutriBadge(food.ns)}${food.nova ? `<span class="tag">NOVA ${food.nova}</span>` : ''}</div>` : '';
@@ -157,12 +157,13 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
     ${entry ? `<button class="btn plain danger-text block" id="fsDel">${t('Eintrag löschen')}</button>` : ''}
     ${editable ? `<button class="btn plain block" id="fsEdit">${t(editable === 'recipe' ? 'Gericht bearbeiten' : 'Lebensmittel bearbeiten')}</button>` : ''}
     <div class="sec"><h4>${t('Nährwerte')}</h4><span class="cols"><span>100 g</span>${sv ? `<span>${t('Portion')}</span>` : ''}</span></div>
-    <div class="card list ntable">${nrow(t('Energie'), 'kcal', 'kcal', 0)}${nrow(t('Protein'), 'p', 'g', 1)}${nrow(t('Kohlenhydrate'), 'c', 'g', 1)}${nrow(t('davon Zucker'), 'sug', 'g', 1, ' micro')}${nrow(t('Fett'), 'f', 'g', 1)}${nrow(t('Ballaststoffe'), 'fib', 'g', 1)}${nrow(t('Salz'), 'salt', 'g', 2)}${micros}</div>
+    <div class="card list ntable">${nrow(t('Energie'), 'kcal', 'kcal', 0)}${nrow(t('Protein'), 'p', 'g', 1)}${nrow(t('Kohlenhydrate'), 'c', 'g', 1)}${nrow(t('davon Zucker'), 'sug', 'g', 1, ' micro')}${nrow(t('Netto-Kohlenhydrate'), 'nc', 'g', 1, ' micro')}${nrow(t('Fett'), 'f', 'g', 1)}${nrow(t('Ballaststoffe'), 'fib', 'g', 1)}${nrow(t('Salz'), 'salt', 'g', 2)}${micros}</div>
     ${food.src === 'off' ? `<p class="hint">${t('Daten: Open Food Facts (ODbL) – Angaben können unvollständig sein.')}</p>` : ''}${food.src === 'usda' ? `<p class="hint">${t('Daten: USDA FoodData Central (gemeinfrei) – Durchschnittswerte pro 100 g.')}</p>` : ''}`, sh => {
     const qi = $('#fsQty'), ui2 = $('#fsUnit');
     const grams = () => num(qi.value, 0, 1e4) * units.find(x => x[0] === ui2.value)[2];
     const live = () => { const n = nutr(food, grams());
-      $('#fsLive').innerHTML = `<div class="live-k"><b>${de(n.kcal)}</b><span>kcal</span></div><div class="live-m">${MACROS.map(([k, l]) => `<span><i class="dot" style="background:var(--${k})"></i>${t(l)} <b>${de(n[k], 1)} g</b></span>`).join('')}</div>`; };
+      const cLive = k => k === 'c' ? ` <small class="sub-nc">(${t('Netto {n}', { n: de(n.nc, 1) })} g)</small>` : '';
+      $('#fsLive').innerHTML = `<div class="live-k"><b>${de(n.kcal)}</b><span>kcal</span></div><div class="live-m">${MACROS.map(([k, l]) => `<span><i class="dot" style="background:var(--${k})"></i>${t(l)} <b>${de(n[k], 1)} g</b>${cLive(k)}</span>`).join('')}</div>`; };
     qi.oninput = live;
     qi.onkeydown = e => { if (e.key === 'Enter') $('#fsSave').click(); };   // never return false from a key handler: browsers treat that as "cancel the keypress" and nothing can be typed
     ui2.onchange = () => { const u = ui2.value; qi.value = u === 'g' || u === 'ml' ? r0(food.serving?.g || 100) : 1; live(); };

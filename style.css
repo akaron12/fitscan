@@ -198,7 +198,7 @@ input[type=range] { width: 100%; accent-color: var(--acc); margin: 0; }
 .banner-ic .ic { width: 19px; height: 19px; }
 .badge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--acc); color: #fff; }
 .summary { cursor: pointer; padding: 18px; }
-.sum-top { display: flex; align-items: center; gap: 22px; }
+.sum-top { display: flex; align-items: center; gap: 18px; }
 .ring { position: relative; flex: none; }
 .ring svg { display: block; transform: rotate(-90deg); }
 .ring circle { transition: stroke-dashoffset .7s cubic-bezier(.2, .8, .2, 1); }
@@ -211,6 +211,7 @@ input[type=range] { width: 100%; accent-color: var(--acc); margin: 0; }
 .mrow .val { color: var(--mut); white-space: nowrap; }
 .mrow .val b { color: var(--txt); font-weight: 600; }
 .mrow .val.over, .mrow .val.over b { color: var(--danger-ink); }
+.sub-nc { font-size: 11.5px; font-weight: 400; color: var(--mut); }
 .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
 .bar > i { display: block; height: 100%; border-radius: 3px; transition: width .7s cubic-bezier(.2, .8, .2, 1); }
 .sum-foot { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 12px; border-top: .5px solid var(--sep); font-size: 13px; color: var(--mut); }

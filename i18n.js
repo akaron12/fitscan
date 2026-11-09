@@ -47,7 +47,7 @@ const EN = {
   // Meals
   'Frühstück': 'Breakfast', 'Mittagessen': 'Lunch', 'Abendessen': 'Dinner', 'Snacks': 'Snacks', 'Mittag': 'Lunch', 'Abend': 'Dinner',
   // Nutrients
-  'Kalorien': 'Calories', 'Protein': 'Protein', 'Kohlenhydrate': 'Carbs', 'Fett': 'Fat', 'K': 'C', 'Ballaststoffe': 'Fiber', 'Zucker': 'Sugar', 'davon Zucker': 'of which sugar', 'Salz': 'Salt',
+  'Kalorien': 'Calories', 'Protein': 'Protein', 'Kohlenhydrate': 'Carbs', 'Netto-Kohlenhydrate': 'Net Carbs', 'Fett': 'Fat', 'K': 'C', 'NC': 'NC', 'Netto': 'Net', 'Netto {n}': 'Net {n}', 'Netto {n} g': 'Net {n} g', 'Ballaststoffe': 'Fiber', 'Zucker': 'Sugar', 'davon Zucker': 'of which sugar', 'Salz': 'Salt',
   'Energie': 'Energy', 'Nährwerte': 'Nutrition', 'Nährwerte pro 100 g': 'Nutrition per 100 g', 'Mikronährstoffe': 'Micronutrients', 'Makros': 'Macros',
   'Gesättigte Fettsäuren': 'Saturated fat', 'Natrium': 'Sodium', 'Cholesterin': 'Cholesterol', 'Kalium': 'Potassium', 'Calcium': 'Calcium', 'Magnesium': 'Magnesium', 'Eisen': 'Iron', 'Zink': 'Zinc',
   'Vitamin A': 'Vitamin A', 'Vitamin C': 'Vitamin C', 'Vitamin D': 'Vitamin D', 'Vitamin E': 'Vitamin E', 'Vitamin B12': 'Vitamin B12', 'Vitamin B6': 'Vitamin B6', 'Folat': 'Folate', 'Koffein': 'Caffeine',

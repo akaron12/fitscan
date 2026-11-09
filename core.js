@@ -93,12 +93,13 @@ let S = load();
 
 // ---------- Nutrition ----------
 const NKEYS = ['kcal', 'p', 'c', 'f', 'fib', 'sug', 'salt'];
-const nutr = (food, g) => { const k = (+g || 0) / 100, n = food?.n || {}, o = {}; for (const key of NKEYS) o[key] = (+n[key] || 0) * k; return o; };
+const nutr = (food, g) => { const k = (+g || 0) / 100, n = food?.n || {}, o = {}; for (const key of NKEYS) o[key] = (+n[key] || 0) * k; o.nc = Math.max(0, o.c - o.fib); return o; };
 // Totals, goals and "logged" only count eaten entries; planned ones are shown separately (projected totals).
 const isEaten = e => e.status !== 'planned';
 function totalsOf(entries) {
   const tot = Object.fromEntries(NKEYS.map(k => [k, 0]));
-  for (const e of entries) { const n = nutr(e.food, e.g); for (const k in tot) tot[k] += n[k]; }
+  for (const e of entries) { const n = nutr(e.food, e.g); for (const k of NKEYS) tot[k] += n[k]; }
+  tot.nc = Math.max(0, tot.c - tot.fib);
   return tot;
 }
 const dayTotals = date => totalsOf((S.entries[date] || []).filter(isEaten));
