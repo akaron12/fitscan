@@ -147,6 +147,7 @@ function dayDetailSheet(d) {
   const kc = { p: tt.p * 4, c: tt.c * 4, f: tt.f * 9 }, tot = kc.p + kc.c + kc.f || 1;
   const row = (l, v, goal) => `<div class="row-item"><span class="grow">${l}</span><span class="row-val"><b>${v}</b>${goal ? `<span class="sub"> / ${goal}</span>` : ''}</span></div>`;
   openSheet(`${sheetHead(t('Tagesdetails'), fmtLong(d))}
+    <button class="btn secondary block" id="copyDayPrompt">${I('copy')}${t('Tag für Claude kopieren')}</button>
     <div class="sec"><h4>${t('Makroverteilung')}</h4><span>${t('Anteil an Kalorien')}</span></div>
     <div class="card"><div class="macrobar">${MACROS.map(([k]) => `<i style="width:${kc[k] / tot * 100}%;background:var(--${k})"></i>`).join('')}</div>
     <div class="legend">${MACROS.map(([k, l]) => `<span><i class="dot" style="background:var(--${k})"></i>${t(l)} <b>${r0(kc[k] / tot * 100)} %</b></span>`).join('')}</div></div>
@@ -154,5 +155,11 @@ function dayDetailSheet(d) {
     <div class="card list">${row(t('Energie'), de(tt.kcal) + ' kcal', de(g.kcal) + ' kcal')}${row(t('Protein'), r0(tt.p) + ' g', g.p + ' g')}${row(t('Kohlenhydrate'), r0(tt.c) + ' g', g.c + ' g')}${row(t('davon Zucker'), r0(tt.sug) + ' g', '< 50 g')}${row(t('Fett'), r0(tt.f) + ' g', g.f + ' g')}${row(t('Ballaststoffe'), r0(tt.fib) + ' g', '≥ 30 g')}${row(t('Salz'), de(tt.salt, 1) + ' g', '< 6 g')}</div>
     <div class="sec"><h4>${t('Mikronährstoffe')}</h4></div>
     ${Object.keys(mic).length ? `<div class="card list">${MICROS.filter(m => mic[m[0]]).map(([k, l, u, f]) => `<div class="row-item"><span class="grow">${t(l)}</span><span class="sub">${t('{a} von {b} Einträgen', { a: cover[k], b: es.length })}</span><b class="row-val">${de(mic[k] * f, u === 'g' ? 1 : 0)} ${u}</b></div>`).join('')}</div>
-      <p class="hint">${t('Nur aus Produkten mit Angaben von Open Food Facts.')}</p>` : `<p class="hint">${t('Keine Mikronährstoff-Daten für diesen Tag. Gescannte Produkte liefern oft Werte wie Natrium, Calcium oder Vitamine.')}</p>`}`);
+      <p class="hint">${t('Nur aus Produkten mit Angaben von Open Food Facts.')}</p>` : `<p class="hint">${t('Keine Mikronährstoff-Daten für diesen Tag. Gescannte Produkte liefern oft Werte wie Natrium, Calcium oder Vitamine.')}</p>`}`, sh => {
+    $('#copyDayPrompt').onclick = async () => {
+      const txt = DayFile.toSummary(d, S.entries[d] || [], S.goals);
+      const ok = await copyText(txt);
+      toast(t(ok ? 'Tag in die Zwischenablage kopiert' : 'Kopieren fehlgeschlagen'));
+    };
+  });
 }

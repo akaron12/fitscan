@@ -5,6 +5,7 @@ This folder (`AI Memory/Meal Tracker/`) is shared between the Meal Tracker app a
 - The app writes what was eaten.
 - Claude plans meals into each day's file.
 - Both read each other's changes. Follow the rules below exactly: the app parses these files with a strict reader.
+- For ready-to-use Claude system instructions and prompt templates, see [`docs/claude-prompt.md`](claude-prompt.md).
 
 ## Files
 | File | Purpose | Who writes |

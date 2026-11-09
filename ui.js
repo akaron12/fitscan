@@ -11,6 +11,13 @@ function toast(msg, action, ms) {
   clearTimeout(el._h); el._h = setTimeout(() => el.classList.remove('show'), ms || (action ? 5000 : 2200));
 }
 const undoable = (msg, fn) => toast(msg, { label: t('Rückgängig'), fn });
+async function copyText(text) {
+  try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(text); return true; } } catch {}
+  try {
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok;
+  } catch { return false; }
+}
 
 // ---------- Sheets ----------
 let sheetTimer = null;

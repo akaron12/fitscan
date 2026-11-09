@@ -210,5 +210,87 @@
     return o;
   }
 
-  root.DayFile = { SUPPORTED_FORMAT, MEAL_IDS, STATUS_IDS, parse, serialize, create, toApp, fromApp, emitScalar, parseScalar };
+  // ---------- Day Summary Markdown (for clipboard / AI chats) ----------
+  function toSummary(date, entries = [], goals = null) {
+    const r0 = x => Math.round(x || 0), r1 = x => Math.round((x || 0) * 10) / 10;
+    const eaten = entries.filter(e => e.status !== 'planned');
+    const planned = entries.filter(e => e.status === 'planned');
+
+    const nutrOf = e => {
+      const k = (+e.g || 0) / 100, n = e.food?.n || {};
+      return {
+        kcal: Math.round((+n.kcal || 0) * k),
+        p: r1((+n.p || 0) * k),
+        c: r1((+n.c || 0) * k),
+        f: r1((+n.f || 0) * k)
+      };
+    };
+
+    const sum = list => list.reduce((acc, e) => {
+      const n = nutrOf(e);
+      acc.kcal += n.kcal; acc.p += n.p; acc.c += n.c; acc.f += n.f;
+      return acc;
+    }, { kcal: 0, p: 0, c: 0, f: 0 });
+
+    const eTot = sum(eaten), pTot = sum(planned);
+    const out = [`# Meal Log: ${date}`, ''];
+
+    if (goals && (goals.kcal > 0 || goals.p > 0 || goals.c > 0 || goals.f > 0)) {
+      const leftKcal = goals.kcal - eTot.kcal;
+      const leftP = goals.p - r0(eTot.p);
+      const leftC = goals.c - r0(eTot.c);
+      const leftF = goals.f - r0(eTot.f);
+      out.push('## Daily Targets & Status');
+      out.push(`- Calories: ${eTot.kcal} / ${goals.kcal} kcal (${leftKcal >= 0 ? `${leftKcal} kcal left` : `${Math.abs(leftKcal)} kcal over`})`);
+      out.push(`- Protein: ${r0(eTot.p)} / ${goals.p} g (${leftP >= 0 ? `${leftP} g left` : `${Math.abs(leftP)} g over`})`);
+      out.push(`- Carbs: ${r0(eTot.c)} / ${goals.c} g (${leftC >= 0 ? `${leftC} g left` : `${Math.abs(leftC)} g over`})`);
+      out.push(`- Fat: ${r0(eTot.f)} / ${goals.f} g (${leftF >= 0 ? `${leftF} g left` : `${Math.abs(leftF)} g over`})`);
+      if (planned.length > 0) {
+        out.push(`- Projected with planned meals: ${eTot.kcal + pTot.kcal} kcal | P ${r0(eTot.p + pTot.p)}g | C ${r0(eTot.c + pTot.c)}g | F ${r0(eTot.f + pTot.f)}g`);
+      }
+      out.push('');
+    } else {
+      out.push('## Daily Status');
+      out.push(`- Calories: ${eTot.kcal} kcal | Protein: ${r0(eTot.p)} g | Carbs: ${r0(eTot.c)} g | Fat: ${r0(eTot.f)} g`);
+      if (planned.length > 0) {
+        out.push(`- Projected with planned meals: ${eTot.kcal + pTot.kcal} kcal | P ${r0(eTot.p + pTot.p)}g | C ${r0(eTot.c + pTot.c)}g | F ${r0(eTot.f + pTot.f)}g`);
+      }
+      out.push('');
+    }
+
+    out.push('## Meals');
+    const MEAL_NAMES = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
+    const order = ['breakfast', 'lunch', 'dinner', 'snacks'];
+
+    for (const mId of order) {
+      const mealEntries = entries.filter(e => e.meal === mId);
+      const mEaten = mealEntries.filter(e => e.status !== 'planned');
+      const mPlanned = mealEntries.filter(e => e.status === 'planned');
+      const mTot = sum(mEaten), mPlanTot = sum(mPlanned);
+
+      const headerParts = [];
+      if (mEaten.length) headerParts.push(`${mTot.kcal} kcal · P ${r0(mTot.p)}g · C ${r0(mTot.c)}g · F ${r0(mTot.f)}g`);
+      if (mPlanned.length) headerParts.push(`Planned: +${mPlanTot.kcal} kcal · P ${r0(mPlanTot.p)}g · C ${r0(mPlanTot.c)}g · F ${r0(mPlanTot.f)}g`);
+      const sub = headerParts.length ? ` (${headerParts.join(' | ')})` : '';
+
+      out.push(`### ${MEAL_NAMES[mId] || mId}${sub}`);
+      if (!mealEntries.length) {
+        out.push('*(none)*');
+      } else {
+        for (const e of mealEntries) {
+          const n = nutrOf(e);
+          const name = e.food?.name || 'Food';
+          const qty = e.label || `${r1(e.g)} g`;
+          const prefix = e.status === 'planned' ? '[Planned] ' : '';
+          const note = e.x?.note ? ` · Note: ${e.x.note}` : '';
+          out.push(`- ${prefix}${name} (${qty}): ${n.kcal} kcal | P ${r1(n.p)}g | C ${r1(n.c)}g | F ${r1(n.f)}g${note}`);
+        }
+      }
+      out.push('');
+    }
+
+    return out.join('\n').trim() + '\n';
+  }
+
+  root.DayFile = { SUPPORTED_FORMAT, MEAL_IDS, STATUS_IDS, parse, serialize, create, toApp, fromApp, toSummary, emitScalar, parseScalar };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

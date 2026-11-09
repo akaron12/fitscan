@@ -138,5 +138,31 @@ const full = fromApp({ id: 'z', meal: 'snacks', g: 50, rev: 2, food: { name: 'Ba
 eq([full.kcal, full.fiber, full.sugar, full.salt, full.nutriscore, full.nova, full.barcode], [200, 5, 10, 0.5, 'b', 4, '123'], 'optional nutrition written');
 eq(entries(parse(serialize(create('2026-11-09', [full]))))[0].barcode, '123', 'barcode round trips as text');
 
+// 17. toSummary() markdown generation
+const goals = { kcal: 2000, p: 150, c: 200, f: 65 };
+const sampleEntries = [
+  { meal: 'breakfast', status: 'eaten', g: 200, label: '200 g', food: { name: 'Greek yogurt', n: { kcal: 65, p: 10, c: 4, f: 0.5 } } },
+  { meal: 'lunch', status: 'eaten', g: 150, label: '150 g', food: { name: 'Chicken breast', n: { kcal: 165, p: 31, c: 0, f: 3.6 } }, x: { note: 'grilled' } },
+  { meal: 'dinner', status: 'planned', g: 150, label: '150 g', food: { name: 'Salmon', n: { kcal: 208, p: 22, c: 0, f: 13 } } }
+];
+const sumMd = DayFile.toSummary('2026-11-08', sampleEntries, goals);
+ok(sumMd.includes('# Meal Log: 2026-11-08'), 'summary has title');
+ok(sumMd.includes('## Daily Targets & Status'), 'summary has targets section');
+ok(sumMd.includes('- Calories: 378 / 2000 kcal (1622 kcal left)'), 'summary tracks eaten calories and remaining');
+ok(sumMd.includes('- Protein: 67 / 150 g (83 g left)'), 'summary tracks protein');
+ok(sumMd.includes('- Projected with planned meals: 690 kcal | P 100g | C 8g | F 26g'), 'summary has projected totals');
+ok(sumMd.includes('### Breakfast (130 kcal · P 20g · C 8g · F 1g)'), 'breakfast header has macros');
+ok(sumMd.includes('- Greek yogurt (200 g): 130 kcal | P 20g | C 8g | F 1g'), 'breakfast entry item');
+ok(sumMd.includes('· Note: grilled'), 'lunch note included');
+ok(sumMd.includes('### Dinner (Planned: +312 kcal · P 33g · C 0g · F 20g)'), 'dinner header has planned totals');
+ok(sumMd.includes('- [Planned] Salmon (150 g): 312 kcal | P 33g | C 0g | F 19.5g'), 'dinner item marked planned');
+ok(sumMd.includes('### Snacks\n*(none)*'), 'empty snacks marked none');
+
+// empty day with no goals
+const emptyMd = DayFile.toSummary('2026-11-08', [], null);
+ok(emptyMd.includes('# Meal Log: 2026-11-08'), 'empty day has title');
+ok(emptyMd.includes('## Daily Status'), 'empty day has status');
+ok(emptyMd.includes('- Calories: 0 kcal | Protein: 0 g | Carbs: 0 g | Fat: 0 g'), 'empty day 0 totals');
+
 print(`\n${passed} passed, ${failed} failed`);
 if (failed) throw new Error(failed + ' test(s) failed'); // jsc ignores quit(code); an uncaught error gives a non-zero exit

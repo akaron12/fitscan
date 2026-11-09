@@ -28,6 +28,9 @@ function renderProfile(v) {
   <div class="sec"><h4>${t('Synchronisation')}</h4></div>
   <div class="card list" id="syncCard">${window.syncCardHtml ? syncCardHtml() : ''}</div>
 
+  <div class="sec"><h4>${t('Claude & KI')}</h4></div>
+  <div class="card list">${navRow('sClaude', 'sparkle', t('Claude-Prompt & Anleitung'), t('System-Prompt für Claude-Chats und Google Drive'))}</div>
+
   <div class="sec"><h4>${t('Daten')}</h4></div>
   <div class="card list">${navRow('exJson', 'download', t('Backup exportieren'), t('Alle Daten als JSON-Datei'))}
     <label class="row-item nav"><span class="row-ic">${I('upload')}</span><span class="grow"><span class="nm">${t('Backup importieren')}</span><span class="sub">${t('Ersetzt die aktuellen Daten')}</span></span>${I('chevR', 'chev')}<input type="file" id="imJson" accept=".json,application/json" hidden></label>
@@ -37,6 +40,7 @@ function renderProfile(v) {
   <p class="foot">${t('Produktdaten © Open-Food-Facts-Mitwirkende, Lizenz')} <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a>. ${t('Allgemeine Lebensmittel: USDA FoodData Central (gemeinfrei).')}</p>`;
 
   $('#pGoals').onclick = goalsSheet; window.bindSyncCard?.();
+  $('#sClaude').onclick = claudePromptSheet;
   $('#sUsda').onchange = e => { USDA.setKey(e.target.value); e.target.value = USDA.getKey(); toast(t(USDA.getKey() ? 'USDA-Key gespeichert' : 'USDA-Key entfernt')); };
   $('#sUsdaTest').onclick = async () => {
     USDA.setKey($('#sUsda').value); $('#sUsda').value = USDA.getKey(); if (!USDA.getKey()) return toast(t('Bitte zuerst einen Key einfügen'));
@@ -64,6 +68,42 @@ function renderProfile(v) {
     if (!await confirmSheet({ title: t('Alle Daten löschen?'), text: t('Tagebuch, eigene Lebensmittel und Einstellungen werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden.'), ok: t('Alle Daten löschen'), danger: true })) return;
     const { theme } = S.settings; S = sanitize({}); S.settings.theme = theme; save(); ui.date = today(); render(); toast(t('Alle Daten gelöscht'));
   };
+}
+
+// ---------- Claude System Prompt ----------
+const CLAUDE_SYSTEM_PROMPT = `You are an expert personal nutritionist and meal planner assisting me with the Meal Tracker app.
+
+## Rules & Principles
+- Meals are strictly: breakfast, lunch, dinner, snacks.
+- Calories strictly follow the 4/4/9 macro rule: 4 kcal/g protein, 4 kcal/g carbs, 9 kcal/g fat.
+- When planning meals, always specify exact portions in grams (qty_g), calories, protein (p), carbs (c), and fat (f).
+- If I paste my Day Log, review my remaining calories and macros (P / C / F) and recommend foods or meals that fit those remaining numbers precisely.
+- If editing Google Drive files in "AI Memory/Meal Tracker/":
+  - Read settings.md first for goals, custom foods, favorites, and recents.
+  - In YYYY-MM-DD.md, only add or modify entries with status: planned.
+  - NEVER edit, overwrite, or delete any entry with status: eaten.
+  - Use strict meal-log/1 YAML format with 2-space indentation.`;
+
+function claudePromptSheet() {
+  openSheet(`${sheetHead(t('Claude-Prompt & Anleitung'), t('Für Claude-Chats, Claude-Projekte und Google Drive'))}
+    <p class="pad lead">${t('So nutzt du Claude mit Meal Tracker:')}</p>
+    <div class="card list">
+      <div class="row-item"><span class="grow"><span class="nm">${t('1. Google Drive Sync')}</span><span class="sub">${t('Claude schreibt geplante Mahlzeiten direkt in deine Tagesdateien (AI Memory/Meal Tracker/).')}</span></span></div>
+      <div class="row-item"><span class="grow"><span class="nm">${t('2. Tageszusammenfassung im Chat')}</span><span class="sub">${t('Tippe in den Tagesdetails auf „Tag für Claude kopieren“ und füge ihn in den Chat ein.')}</span></span></div>
+    </div>
+    <div class="sec"><h4>${t('System-Prompt für Claude')}</h4></div>
+    <button class="btn block" id="copyPromptBtn">${I('copy')}${t('System-Prompt kopieren')}</button>
+    <div class="prompt-box"><pre><code>${esc(CLAUDE_SYSTEM_PROMPT)}</code></pre></div>
+    <div class="sec"><h4>${t('Beispiel-Prompts für den Chat')}</h4></div>
+    <div class="card list">
+      <div class="row-item"><span class="grow"><span class="nm">${t('„Hier ist mein Tag: [Einfügen]. Was kann ich zu Abend essen, um mein Proteinziel zu erreichen?“')}</span></span></div>
+      <div class="row-item"><span class="grow"><span class="nm">${t('„Plane mein morgiges Frühstück und Mittagessen mit ca. 1.200 kcal und 90 g Protein.“')}</span></span></div>
+    </div>`, sh => {
+    $('#copyPromptBtn').onclick = async () => {
+      const ok = await copyText(CLAUDE_SYSTEM_PROMPT);
+      toast(t(ok ? 'Prompt in die Zwischenablage kopiert' : 'Kopieren fehlgeschlagen'));
+    };
+  });
 }
 
 // ---------- Goals sheet ----------
