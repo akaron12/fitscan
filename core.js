@@ -17,6 +17,8 @@ const daysBetween = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a
 const fmtDate = s => new Date(s + 'T12:00:00').toLocaleDateString(LOC(), { weekday: 'short', day: 'numeric', month: 'short' });
 const fmtLong = s => new Date(s + 'T12:00:00').toLocaleDateString(LOC(), { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtShort = s => new Date(s + 'T12:00:00').toLocaleDateString(LOC(), { day: 'numeric', month: 'numeric' });
+const G_PER_OZ = 28.3495;   // grams in one ounce (custom food entry; entries always store grams)
+const fmtQty = q => (+q).toLocaleString(LOC(), { maximumFractionDigits: 2 });   // 150 → "150", 2.5 → "2.5": shown the way it was typed
 const de = (x, d = 0) => (x ?? 0).toLocaleString(LOC(), { maximumFractionDigits: d, minimumFractionDigits: d });
 const signed = (x, d = 0) => (x > 0 ? '+' : x < 0 ? '−' : '') + de(Math.abs(x), d);
 const isObj = x => x && typeof x === 'object' && !Array.isArray(x);
@@ -161,9 +163,9 @@ function deleteCustomFood(id) {
 function startPortion(f) {
   const d = defaultPortion(f), rc = S.recents.find(r => r.id === f.id), q = rc?.lastQ, u = rc?.lastU;
   if (!(q > 0)) return d;
-  const per = u === 'g' || u === 'ml' ? 1 : u === 'serv' ? f.serving?.g : u === 'pc' ? f.piece?.g : 0;
+  const per = u === 'g' || u === 'ml' ? 1 : u === 'oz' ? G_PER_OZ : u === 'serv' ? f.serving?.g : u === 'pc' ? f.piece?.g : 0;
   if (!(per > 0)) return d;
-  const label = u === 'g' ? `${de(q)} g` : u === 'ml' ? `${de(q)} ml` : `${de(q, q % 1 ? 1 : 0)} × ${u === 'serv' ? f.serving.label || 'Portion' : 'Stück'}`;
+  const label = u === 'g' ? `${de(q)} g` : u === 'ml' ? `${de(q)} ml` : u === 'oz' ? `${fmtQty(q)} oz` : `${de(q, q % 1 ? 1 : 0)} × ${u === 'serv' ? f.serving.label || 'Portion' : 'Stück'}`;
   return { g: q * per, label, unit: u, qty: q };
 }
 const defaultPortion = f => f.serving?.g ? { g: f.serving.g, label: `1 × ${f.serving.label}`, unit: 'serv', qty: 1 } : { g: 100, label: '100 g', unit: 'g', qty: 100 };

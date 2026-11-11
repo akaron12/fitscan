@@ -195,7 +195,7 @@
     f.uses = Number.isInteger(o.uses) && o.uses >= 1 ? o.uses : 1;
     if (o.lastG != null) { if (good(o.lastG, 2e4)) f.lastG = r1(o.lastG); else if (strict) bad('lastG must be a number greater than 0'); }
     if (o.lastU != null || o.lastQ != null) {
-      if (['g', 'ml', 'serv', 'pc'].includes(o.lastU) && good(o.lastQ, 1e4)) { f.lastU = o.lastU; f.lastQ = o.lastQ; } else if (strict) bad('lastU/lastQ invalid');
+      if (['g', 'ml', 'serv', 'pc', 'oz'].includes(o.lastU) && good(o.lastQ, 1e4)) { f.lastU = o.lastU; f.lastQ = o.lastQ; } else if (strict) bad('lastU/lastQ invalid');
     }
     return f;
   }

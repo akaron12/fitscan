@@ -38,6 +38,8 @@ eq([l[0].lastG, l[0].lastU, l[0].lastQ], [40, 'g', 40], 'the amount of the lates
 l = log(l, 'a', 6, { g: 999, unit: 'g', qty: 999 });
 eq([l[0].lastG, l[0].uses, l[0].last], [40, 3, day(1)], 'logging an earlier day later keeps the latest amount and date, only the count goes up');
 eq(R.touch([], food('a'), { date: day(0), today: TODAY, days: 30, g: -5, unit: 'zz', qty: 'x' })[0].lastU, undefined, 'a bad amount is not stored');
+eq((l = R.touch([], food('a'), { date: day(0), today: TODAY, days: 30, g: 141.7475, unit: 'oz', qty: 5 }))[0].lastU + l[0].lastQ + '/' + l[0].lastG, 'oz5/141.7475', 'an amount typed in oz is remembered as oz (grams stay the source of truth)');
+eq(DayMerge.cleanRecent(l[0], true).lastU, 'oz', 'sync accepts oz as a unit');
 
 // ---- sort
 l = []; l = log(l, 'a', 5); l = log(l, 'a', 5); l = log(l, 'a', 4); l = log(l, 'b', 1); l = log(l, 'c', 0); l = log(l, 'b', 0); l = log(l, 'c', 0);

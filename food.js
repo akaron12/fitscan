@@ -131,6 +131,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
   if (food.serving?.g) units.push(['serv', tFood(food.serving.label || 'Portion'), food.serving.g]);
   if (food.piece?.g) units.push(['pc', t('Stück'), food.piece.g]);
   if (/Getränke/.test(food.cat || '')) units.push(['ml', 'ml', 1]);
+  if (entry?.unit === 'oz' || (!entry && S.recents.find(r => r.id === food.id)?.lastU === 'oz')) units.push(['oz', 'oz', G_PER_OZ]);   // only shown for amounts entered in oz
   let unit = entry ? (entry.unit || 'g') : (food.serving?.g ? 'serv' : 'g'), qty = entry ? (entry.qty ?? entry.g) : (food.serving?.g ? 1 : 100);
   if (!units.some(u => u[0] === unit)) { unit = 'g'; qty = entry ? entry.g : 100; }
   if (!entry) { const sp = startPortion(food); if (units.some(u => u[0] === sp.unit)) { unit = sp.unit; qty = sp.qty; } }   // start from the amount used last time
@@ -174,7 +175,7 @@ function foodSheet(food, { entry = null, date = ui.date } = {}) {
     const doSave = status => {
       const g = grams(); if (!(g > 0)) return toast(t('Bitte Menge eingeben')); if (g > 2e4) return toast(t('Menge zu groß'));
       const u = units.find(x => x[0] === ui2.value), q = num(qi.value, 0, 1e4);
-      const label = u[0] === 'g' ? `${de(q)} g` : u[0] === 'ml' ? `${de(q)} ml` : `${de(q, q % 1 ? 1 : 0)} × ${u[0] === 'serv' ? food.serving.label || 'Portion' : 'Stück'}`;
+      const label = u[0] === 'g' ? `${de(q)} g` : u[0] === 'ml' ? `${de(q)} ml` : u[0] === 'oz' ? `${fmtQty(q)} oz` : `${de(q, q % 1 ? 1 : 0)} × ${u[0] === 'serv' ? food.serving.label || 'Portion' : 'Stück'}`;
       if (entry) { touch(entry, { g, label, meal, unit: u[0], qty: q, ...(status ? { status } : {}) }); save(); closeSheet(); rerender(); return toast(t('Gespeichert')); }
       const e = addEntry(food, g, label, meal, date, { unit: u[0], qty: q });
       closeSheet(); ui.targetMeal = null; go('diary', { date });
@@ -195,6 +196,9 @@ function customFoodSheet(f = null, code = '') {
     <div class="grid2">${field('cfK', t('Kalorien'), inputNum(n.kcal), { unit: 'kcal' })}${field('cfP', t('Protein'), inputNum(n.p), { unit: 'g' })}${field('cfC', t('Kohlenhydrate'), inputNum(n.c), { unit: 'g' })}${field('cfF', t('Fett'), inputNum(n.f), { unit: 'g' })}
       ${field('cfS', t('Zucker'), inputNum(n.sug), { unit: 'g' })}${field('cfB', t('Ballaststoffe'), inputNum(n.fib), { unit: 'g' })}${field('cfSa', t('Salz'), inputNum(n.salt), { unit: 'g' })}${field('cfServ', t('Portion'), inputNum(f?.serving?.g), { unit: 'g' })}</div>
     <p class="hint" id="cfHint"></p>
+    ${f ? '' : `<div class="sec"><h4>${t('Menge')}</h4></div>
+    <div class="amount"><input class="input qty" id="cfQty" type="text" inputmode="decimal" autocomplete="off" required aria-required="true" placeholder="0" aria-label="${t('Menge')}">
+      <select class="input" id="cfUnit" aria-label="${t('Einheit')}"><option value="g" selected>g</option><option value="oz">oz</option></select></div>`}
     <button class="btn block" id="cfSave">${t('Speichern')}</button>${f ? `<button class="btn plain danger-text block" id="cfDel">${t('Löschen')}</button>` : ''}</div>`, () => {
     if (!f) setTimeout(() => $('#cfName')?.focus(), 250);
     // Calories ARE the macros (4/4/9): the calories box is calculated and read-only, and Save refuses macros that cannot be right (macros.js).
@@ -210,10 +214,22 @@ function customFoodSheet(f = null, code = '') {
       const name = $('#cfName').value.trim(); if (!name) return toast(t('Bitte Namen eingeben'));
       follow();                                                                       // calories always come from the macros
       const bad = Macros.check(macros()); if (bad) { hint(); return toast(problem(bad)); }
+      // New foods are logged right away, and only with an amount you typed (no default): required, decimals allowed, greater than 0.
+      let q = 0, unit = 'g', g = 0;
+      if (!f) {
+        q = parseFloat($('#cfQty').value.replace(',', '.')); unit = $('#cfUnit').value === 'oz' ? 'oz' : 'g';
+        if (!Number.isFinite(q) || !(q > 0)) { $('#cfQty').focus(); return toast(t('Bitte Menge eingeben')); }
+        g = Math.round(q * (unit === 'oz' ? G_PER_OZ : 1) * 1e4) / 1e4;
+        if (g > 2e4) { $('#cfQty').focus(); return toast(t('Menge zu groß')); }
+      }
       const id = f?.id || 'cust:' + (code || uid());
       const food = { id, src: 'custom', code: code || f?.code || '', name, brand: $('#cfBrand').value.trim(), cat: 'Eigene', n: { kcal: v('cfK'), p: v('cfP'), c: v('cfC'), f: v('cfF'), sug: v('cfS'), fib: v('cfB'), salt: v('cfSa') }, serving: v('cfServ') ? { g: v('cfServ'), label: 'Portion' } : null };
       saveCustomFood(food);
-      save(); toast(t('Gespeichert')); if (ui.tab === 'library') rerender(); foodSheet(food);
+      save();
+      if (f) { toast(t('Gespeichert')); if (ui.tab === 'library') rerender(); return foodSheet(food); }
+      const date = ui.date, e = addEntry(food, g, `${fmtQty(q)} ${unit}`, ui.targetMeal || mealDefault(), date, { unit, qty: q });
+      closeSheet(); ui.targetMeal = null; go('diary', { date });
+      undoable(t('{name} hinzugefügt', { name: food.name }), () => deleteSilently(date, e));
     };
     if (f) $('#cfDel').onclick = async () => {
       if (!await confirmSheet({ title: t('„{n}“ löschen?', { n: esc(f.name) }), text: t('Bereits eingetragene Mahlzeiten bleiben erhalten.'), ok: t('Löschen'), danger: true })) return;

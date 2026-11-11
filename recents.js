@@ -1,10 +1,10 @@
 'use strict';
 /* Recents: the unique foods logged within a window of days (default 30), newest first, each with the date it was last logged,
    the amount of that log and how often it was logged. Pure functions on plain data (no DOM, no storage), so tests can run them.
-   A recent is a food snapshot plus:  last 'YYYY-MM-DD' · lastG grams · lastU unit ('g'|'ml'|'serv'|'pc') · lastQ quantity in that unit · uses (>= 1).
+   A recent is a food snapshot plus:  last 'YYYY-MM-DD' · lastG grams · lastU unit ('g'|'ml'|'serv'|'pc'|'oz') · lastQ quantity in that unit · uses (>= 1).
    The list is always kept sorted by `last`, newest first. Plain script: globalThis.Recents (works in the browser and in jsc). */
 (function (root) {
-  const DAYS = [7, 14, 30, 60, 90], DEFAULT_DAYS = 30, MAX = 300, UNITS = ['g', 'ml', 'serv', 'pc'];
+  const DAYS = [7, 14, 30, 60, 90], DEFAULT_DAYS = 30, MAX = 300, UNITS = ['g', 'ml', 'serv', 'pc', 'oz'];
   const DATE = /^\d{4}-\d{2}-\d{2}$/;
   const shift = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
   /** A food is kept while its last log is on or after this date: with 30 days, 29 days ago is in, 31 days ago is out. */
