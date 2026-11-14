@@ -294,6 +294,7 @@ async function openScanner() {
     let det = null; try { if ('BarcodeDetector' in window) det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'] }); } catch { det = null; }
     zxReader = new ZXing.BrowserMultiFormatReader(zxHints());
     const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+    let frames = 0, lastErr = '';   // diagnostics shown in the status line while nothing has been found yet
     const tick = async () => {
       if (!scanning) return;
       let found = null;
@@ -303,10 +304,12 @@ async function openScanner() {
           if (!found) {
             const k = Math.min(1, 960 / video.videoWidth); cv.width = Math.round(video.videoWidth * k); cv.height = Math.round(video.videoHeight * k);
             cx.drawImage(video, 0, 0, cv.width, cv.height);
-            try { found = zxReader.decodeBitmap(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(cv)))).getText(); } catch {}   // nothing in this frame
+            try { found = zxReader.decodeBitmap(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(cv)))).getText(); } catch (e) { if (e?.name !== 'NotFoundException' && e?.name !== 'ChecksumException' && e?.name !== 'FormatException') lastErr = e?.name || 'err'; }   // NotFound = nothing in this frame
+            frames++;
           }
         }
-      } catch {}
+      } catch (e) { lastErr = e?.name || 'err'; }
+      if (!found && scanning && frames && frames % 5 === 0 && !serialBusy && !lastCode) scanStatus(`${t('Barcode in den Rahmen halten')} · ${frames}${det ? '' : 'z'}${lastErr ? ' ' + lastErr : ''}`);
       if (found && scanning) onScanned(found);
       if (scanning) scanLoop = setTimeout(tick, 90);
     };
