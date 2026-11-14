@@ -275,7 +275,7 @@ function recipeSheet(r = null) {
 }
 
 // ---------- Barcode scanner ----------
-let scanStream = null, scanLoop = null, zxReader = null, scanning = false, lastCode = '', lastAt = 0;
+let scanStream = null, scanLoop = null, zxReader = null, scanning = false, lastCode = '', lastAt = 0, serialBusy = false;
 const zxHints = () => { const h = new Map(), F = ZXing.BarcodeFormat; h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128, F.QR_CODE]); h.set(ZXing.DecodeHintType.TRY_HARDER, true); return h; };
 const scanStatus = s => $('#scanStatus').textContent = s;
 function scanModeUI() { const on = S.settings.continuousScan; $('#scanMode').classList.toggle('on', on); $('#scanModeL').textContent = t(on ? 'Serienscan an' : 'Serienscan aus'); }
@@ -307,15 +307,17 @@ function closeScanner() {
 }
 function onScanned(raw) {
   const s = String(raw).trim(), code = /^\d{6,14}$/.test(s) ? s : (s.match(/\d{8,14}/) || [])[0];
-  if (code && code === lastCode && Date.now() - lastAt < 2500) return;
-  lastCode = code; lastAt = Date.now(); navigator.vibrate?.(60); beep();
+  const now = Date.now();
+  if (code && code === lastCode && now - lastAt < 2500) { lastAt = now; return; }   // same barcode still in frame: ignore until it has been out of view for a moment
+  if (S.settings.continuousScan && code && serialBusy) return;                      // previous lookup still running
+  lastCode = code; lastAt = now; navigator.vibrate?.(60); beep();
   if (S.settings.continuousScan && code) { pushScan(code); return serialAdd(code); }
   stopStream(); $('#scanner').classList.add('hidden');
   if (code) handleBarcode(code);
   else openSheet(`${sheetHead(t('QR-Code erkannt'))}<p class="lead break">${esc(s)}</p><p class="hint">${t('Dieser Code enthält keine Produktnummer.')}</p>`);
 }
 async function serialAdd(code) {
-  scanStatus(t('Suche {c}…', { c: code }));
+  serialBusy = true; scanStatus(t('Suche {c}…', { c: code }));
   try {
     const p = (await lookupBarcode(code)).product;
     if (!p) return scanStatus(t('{c}: nicht gefunden', { c: code }));
@@ -327,7 +329,7 @@ async function serialAdd(code) {
     addPending(code, ui.targetMeal || mealDefault(), ui.date);
     $('#scanTray').insertAdjacentHTML('afterbegin', `<div class="tray-item">${I('clock')}<span class="grow">Barcode ${esc(code)}</span><b>⏳</b></div>`);
     scanStatus(t('Offline – wird später nachgeschlagen'));
-  }
+  } finally { serialBusy = false; lastAt = Date.now(); }
 }
 $('#scanClose').onclick = closeScanner;
 $('#scanMode').onclick = () => { S.settings.continuousScan = !S.settings.continuousScan; save(); scanModeUI(); };
