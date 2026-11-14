@@ -126,9 +126,18 @@ applyTheme();
 render();
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const hadController = !!navigator.serviceWorker.controller;   // false on the very first visit: nothing to update then
-  navigator.serviceWorker.register('sw.js').catch(() => {});
-  navigator.serviceWorker.addEventListener('controllerchange', () => {   // a new version took over: the page still runs the old code until it reloads
-    if (hadController) toast(t('Update verfügbar'), { label: t('Neu laden'), fn: () => location.reload() }, 60000);
+  let updated = false, reloading = false;
+  // A new version took over: the page still runs the old code until it reloads. Reload by itself, but never while a sheet or the scanner is open
+  // (that would throw away what you are typing); then wait until the app goes to the background or the sheet closes.
+  const idle = () => $('#sheet').classList.contains('hidden') && $('#scanner').classList.contains('hidden');
+  const applyUpdate = () => { if (!updated || reloading || !idle()) return; reloading = true; location.reload(); };
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    // Installed apps are often resumed rather than relaunched, so look for a new version every time the app comes back to the front.
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); else applyUpdate(); });
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return; updated = true; applyUpdate();
+    if (!reloading) { toast(t('Update verfügbar'), { label: t('Neu laden'), fn: () => location.reload() }, 60000); setInterval(applyUpdate, 3000); }
   });
 }
 window.FitScan = { lookupBarcode, searchOFF, dayTotals, decodeImageFile, scoreFood, streak, get state() { return S; } };
