@@ -290,17 +290,30 @@ async function openScanner() {
     video.srcObject = scanStream; await video.play();
     scanStatus(t('Barcode in den Rahmen halten'));
     const caps = scanStream.getVideoTracks()[0]?.getCapabilities?.() || {}; $('#scanTorch').style.visibility = caps.torch ? 'visible' : 'hidden';
-    if ('BarcodeDetector' in window) {
-      const det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'] });
-      const tick = async () => { if (!scanning) return; try { const r = await det.detect(video); if (r.length) onScanned(r[0].rawValue); } catch {} if (scanning) scanLoop = requestAnimationFrame(tick); };
-      tick();
-    } else {
-      zxReader = new ZXing.BrowserMultiFormatReader(zxHints());
-      zxReader.decodeFromVideoElementContinuously(video, res => { if (res && scanning) onScanned(res.getText()); });
-    }
+    // One loop for every browser: try the native BarcodeDetector if it works, otherwise (or when it sees nothing) decode the frame with ZXing, the same decoder the Photo option uses.
+    let det = null; try { if ('BarcodeDetector' in window) det = new BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code'] }); } catch { det = null; }
+    zxReader = new ZXing.BrowserMultiFormatReader(zxHints());
+    const cv = document.createElement('canvas'), cx = cv.getContext('2d', { willReadFrequently: true });
+    const tick = async () => {
+      if (!scanning) return;
+      let found = null;
+      try {
+        if (video.readyState >= 2 && video.videoWidth) {
+          if (det) { try { const r = await det.detect(video); if (r.length) found = r[0].rawValue; } catch { det = null; } }
+          if (!found) {
+            const k = Math.min(1, 960 / video.videoWidth); cv.width = Math.round(video.videoWidth * k); cv.height = Math.round(video.videoHeight * k);
+            cx.drawImage(video, 0, 0, cv.width, cv.height);
+            try { found = zxReader.decodeBitmap(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(cv)))).getText(); } catch {}   // nothing in this frame
+          }
+        }
+      } catch {}
+      if (found && scanning) onScanned(found);
+      if (scanning) scanLoop = setTimeout(tick, 90);
+    };
+    tick();
   } catch (e) { scanStatus(t('{e} – nutze „Nummer eingeben“ oder „Foto“.', { e: e.message || t('Kein Kamerazugriff') })); }
 }
-function stopStream() { scanning = false; cancelAnimationFrame(scanLoop); try { zxReader?.reset(); } catch {} zxReader = null; scanStream?.getTracks().forEach(tr => tr.stop()); scanStream = null; }
+function stopStream() { scanning = false; clearTimeout(scanLoop); try { zxReader?.reset(); } catch {} zxReader = null; scanStream?.getTracks().forEach(tr => tr.stop()); scanStream = null; }
 function closeScanner() {
   const added = $('#scanTray').children.length; stopStream(); $('#scanner').classList.add('hidden');
   if (added) { ui.targetMeal = null; go('diary'); }
