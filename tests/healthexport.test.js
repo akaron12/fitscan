@@ -23,6 +23,10 @@ eq(H.totals([], nutrOf), { calories: 0, protein: 0, carbs: 0, fat: 0 }, 'empty l
 eq(H.url({ calories: 10, protein: 20, carbs: 30, fat: 40 }),
   'shortcuts://run-shortcut?name=Log%20Meal&input=text&text=%7B%22calories%22%3A10%2C%22protein%22%3A20%2C%22carbs%22%3A30%2C%22fat%22%3A40%7D', 'shortcut URL matches the tested one');
 
+// url with a return link: x-callback form, Shortcuts opens x-success when the shortcut is done
+eq(H.url({ calories: 10, protein: 20, carbs: 30, fat: 40 }, 'https://akaron12.github.io/fitscan/'),
+  'shortcuts://x-callback-url/run-shortcut?name=Log%20Meal&input=text&text=%7B%22calories%22%3A10%2C%22protein%22%3A20%2C%22carbs%22%3A30%2C%22fat%22%3A40%7D&x-success=https%3A%2F%2Fakaron12.github.io%2Ffitscan%2F', 'x-callback URL with x-success');
+
 // supported: iPhone/iPad only
 eq([H.supported('Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X)'), H.supported('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'), H.supported('')], [true, false, false], 'only iPhone/iPad');
 

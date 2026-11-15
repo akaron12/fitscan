@@ -20,7 +20,9 @@
     for (const k in o) o[k] = r1(o[k]);
     return o;
   };
-  const url = tot => 'shortcuts://run-shortcut?name=' + encodeURIComponent(SHORTCUT) + '&input=text&text=' + encodeURIComponent(JSON.stringify(tot));
+  /** back (optional): a URL Shortcuts opens when the shortcut finishes (x-callback-url), to return to the app. */
+  const url = (tot, back) => 'shortcuts://' + (back ? 'x-callback-url/' : '') + 'run-shortcut?name=' + encodeURIComponent(SHORTCUT) + '&input=text&text=' + encodeURIComponent(JSON.stringify(tot))
+    + (back ? '&x-success=' + encodeURIComponent(back) : '');
   /** Only on iPhone/iPad: the shortcut's Health actions do not exist on a Mac. */
   const supported = ua => /iPhone|iPad|iPod/.test(ua || '');
   /** Clean S.hk: keep only arrays of ids for real dates within the last KEEP_DAYS days (todayStr 'YYYY-MM-DD'). */
