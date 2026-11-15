@@ -115,6 +115,8 @@ main > .btn.block { margin-bottom: 12px; }
 .icon-plain { width: 38px; height: 38px; border: 0; border-radius: 10px; background: none; color: var(--acc); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .icon-plain:active { background: var(--acc-soft); }
 .icon-plain .ic { width: 20px; height: 20px; }
+.icon-plain.hk-done { color: var(--danger); }
+.icon-plain.hk-done .ic { fill: currentColor; }
 .icon-btn { width: 44px; height: 44px; border: 0; border-radius: 12px; background: var(--fill); color: var(--acc); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .icon-btn .ic { width: 21px; height: 21px; }
 .round-btn { width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--bg); color: var(--acc); display: inline-flex; align-items: center; justify-content: center; flex: none; }

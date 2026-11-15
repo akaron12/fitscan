@@ -82,6 +82,8 @@ function sanitize(o) {
   let rec = s.recents.filter(f => isObj(f) && isObj(f.n) && f.id != null);
   if (!st.recentsV2) { rec = Recents.migrate(rec, s.entries, today(), st.recentsDays); st.recentsV2 = true; }
   s.recents = Recents.prune(Recents.normalize(rec, today()), today(), st.recentsDays);
+  // Apple Health: which entries this device already sent (see healthexport.js). Local only, never synced.
+  s.hk = HealthExport.prune(s.hk, today());
   s.version = 6;
   return s;
 }

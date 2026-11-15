@@ -11,6 +11,7 @@ echo "== security (CSP, inline code, service worker list)"; "$JSC" tests/securit
 echo "== english only"; "$JSC" i18n.js foods.js tests/i18n.test.js || status=1
 echo "== usda"; "$JSC" usda.js tests/usda.test.js || status=1
 echo "== swipe"; "$JSC" swipe.js tests/swipe.test.js || status=1
+echo "== health export"; "$JSC" healthexport.js tests/healthexport.test.js || status=1
 echo "== macros"; "$JSC" macros.js tests/macros.test.js || status=1
 echo "== recents"; "$JSC" recents.js dayfile.js merge.js tests/recents.test.js || status=1
 echo "== merge"; "$JSC" recents.js dayfile.js merge.js tests/merge.test.js || status=1

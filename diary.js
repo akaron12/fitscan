@@ -27,16 +27,20 @@ function renderDiary(v) {
     <div class="macros">${MACROS.map(([k, l]) => mrow(k, l)).join('')}</div></div>
     <div class="sum-foot"><span>${t('{a} von {b} kcal', { a: de(tt.kcal), b: de(g.kcal) })}</span>${st ? `<span class="streak" title="${t('Tage in Folge geloggt')}">${I('flame')}${st}</span>` : ''}<span class="grow"></span><span class="link">${t('Details')}${I('chevR')}</span></div>${projLine(tt, pt, g)}</section>`;
 
+  const hkOn = HealthExport.supported(navigator.userAgent);
   if (!es.length && isLogged(addDays(d, -1))) html += `<button class="btn secondary block" id="copyDay">${I('undo')}${t('Ganzen Tag von gestern kopieren')}</button>`;
 
   for (const [id, name] of MEALS) {
     const me = es.filter(e => e.meal === id), eatenN = me.filter(isEaten).length, planned = me.filter(e => !isEaten(e));
     const kc = me.filter(isEaten).reduce((a, e) => a + nutr(e.food, e.g).kcal, 0), pk = planned.reduce((a, e) => a + nutr(e.food, e.g).kcal, 0);
     const canCopy = !me.length && (S.entries[addDays(d, -1)] || []).some(e => e.meal === id);
+    const hkBtn = hkOn && eatenN ? (HealthExport.unsent(me, id, S.hk[d]).length
+      ? `<button class="icon-plain" data-hk="${id}" aria-label="${t('An Health senden')}" title="${t('An Health senden')}">${I('heart')}</button>`
+      : `<button class="icon-plain hk-done" data-hk="${id}" aria-label="${t('Schon in Health')}" title="${t('Schon in Health')}">${I('heart')}</button>`) : '';
     html += `<section class="card meal"><header class="card-h"><h3>${t(name)}</h3><span class="card-v">${eatenN ? de(kc) + ' kcal' : ''}${pk ? `${eatenN ? ' ' : ''}<span class="plan-k">+${de(pk)} ${t('geplant')}</span>` : ''}</span></header>
       ${me.length ? `<div class="list">${me.map(entryRow).join('')}</div>` : ''}
       <footer class="meal-f"><button class="link-btn" data-add="${id}">${I('plus')}${t('Hinzufügen')}</button>${planned.length ? `<button class="link-btn" data-confirm="${id}">${I('check')}${t('Alle bestätigen')}</button>` : ''}${canCopy ? `<button class="link-btn quiet" data-copy="${id}">${t('Wie gestern')}</button>` : ''}<span class="grow"></span>
-      <button class="icon-plain" data-quick="${id}" aria-label="${t('Schnelleintrag')}" title="${t('Schnelleintrag')}">${I('zap')}</button><button class="icon-plain" data-mscan="${id}" aria-label="${t('Scannen')}" title="${t('Scannen')}">${I('scan')}</button></footer></section>`;
+      ${hkBtn}<button class="icon-plain" data-quick="${id}" aria-label="${t('Schnelleintrag')}" title="${t('Schnelleintrag')}">${I('zap')}</button><button class="icon-plain" data-mscan="${id}" aria-label="${t('Scannen')}" title="${t('Scannen')}">${I('scan')}</button></footer></section>`;
   }
 
   v.innerHTML = html;
@@ -51,6 +55,7 @@ function renderDiary(v) {
   $$('[data-add]', v).forEach(b => b.onclick = () => go('library', { targetMeal: b.dataset.add, query: '' }));
   $$('[data-copy]', v).forEach(b => b.onclick = () => copyEntries((S.entries[addDays(d, -1)] || []).filter(e => e.meal === b.dataset.copy), d));
   $$('[data-quick]', v).forEach(b => b.onclick = () => quickAddSheet(b.dataset.quick));
+  $$('[data-hk]', v).forEach(b => b.onclick = () => sendMealToHealth(d, b.dataset.hk));
   $$('[data-mscan]', v).forEach(b => b.onclick = () => { ui.targetMeal = b.dataset.mscan; openScanner(); });
   $$('[data-chk]', v).forEach(b => b.onclick = ev => { ev.stopPropagation(); const e = es.find(x => x.id === b.dataset.chk); if (e) confirmPlanned(d, [e]); });
   $$('[data-confirm]', v).forEach(b => b.onclick = () => confirmPlanned(d, es.filter(e => e.meal === b.dataset.confirm && !isEaten(e))));
@@ -66,6 +71,16 @@ function projLine(tt, pt, g) {
   if (!(pt.kcal > 0)) return '';
   const left = g.kcal - tt.kcal - pt.kcal;
   return `<div class="proj">${t(left >= 0 ? 'Mit Geplantem: {r} kcal übrig' : 'Mit Geplantem: {r} kcal drüber', { r: de(Math.abs(left)) })} · P ${r0(tt.p + pt.p)} / ${g.p} g</div>`;
+}
+/** Sends the meal's not-yet-sent eaten entries to Apple Health via the "Log Meal" shortcut, then marks them sent on this device.
+    Undo only clears the mark (the shortcut cannot take values back out of Health). */
+function sendMealToHealth(date, meal) {
+  const list = HealthExport.unsent(S.entries[date], meal, S.hk[date]);
+  if (!list.length) return toast(t('Schon in Health'));
+  const tot = HealthExport.totals(list, e => nutr(e.food, e.g)), ids = list.map(e => e.id);
+  (S.hk[date] ||= []).push(...ids); save(true); rerender();
+  undoable(t('{n} kcal an Health gesendet', { n: de(tot.calories) }), () => { S.hk[date] = (S.hk[date] || []).filter(x => !ids.includes(x)); save(true); rerender(); });
+  location.href = HealthExport.url(tot);
 }
 /** One tap: planned -> eaten at the planned amount. Undo puts it back to planned. */
 function confirmPlanned(date, list) {
