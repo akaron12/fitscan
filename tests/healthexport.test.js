@@ -23,6 +23,18 @@ eq(H.totals([], nutrOf), { calories: 0, protein: 0, carbs: 0, fat: 0 }, 'empty l
 eq(H.url({ calories: 10, protein: 20, carbs: 30, fat: 40 }),
   'shortcuts://run-shortcut?name=Log%20Meal&input=text&text=%7B%22calories%22%3A10%2C%22protein%22%3A20%2C%22carbs%22%3A30%2C%22fat%22%3A40%7D', 'shortcut URL matches the tested one');
 
+// url with a meal date: same keys plus date, so the shortcut can log on the meal's day
+eq(H.url({ calories: 10, protein: 20, carbs: 30, fat: 40 }, '2026-11-12T12:30:00'),
+  'shortcuts://run-shortcut?name=Log%20Meal&input=text&text=' + encodeURIComponent('{"calories":10,"protein":20,"carbs":30,"fat":40,"date":"2026-11-12T12:30:00"}'), 'date is added to the JSON');
+
+// stamp: meal clock time on its own day; today never later than now
+eq([H.stamp('2026-11-12', 'breakfast', '2026-11-15', '10:00'), H.stamp('2026-11-12', 'lunch', '2026-11-15', '10:00'),
+  H.stamp('2026-11-12', 'dinner', '2026-11-15', '10:00'), H.stamp('2026-11-12', 'snacks', '2026-11-15', '10:00')],
+  ['2026-11-12T08:00:00', '2026-11-12T12:30:00', '2026-11-12T19:00:00', '2026-11-12T15:30:00'], 'past day: typical meal times');
+eq([H.stamp('2026-11-15', 'dinner', '2026-11-15', '10:05'), H.stamp('2026-11-15', 'breakfast', '2026-11-15', '10:05')],
+  ['2026-11-15T10:05:00', '2026-11-15T08:00:00'], 'today: a meal time still ahead becomes now');
+eq(H.stamp('2026-11-12', 'brunch', '2026-11-15', '10:00'), '2026-11-12T12:00:00', 'unknown meal falls back to noon');
+
 // supported: iPhone/iPad only
 eq([H.supported('Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X)'), H.supported('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'), H.supported('')], [true, false, false], 'only iPhone/iPad');
 

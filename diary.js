@@ -34,7 +34,7 @@ function renderDiary(v) {
     const me = es.filter(e => e.meal === id), eatenN = me.filter(isEaten).length, planned = me.filter(e => !isEaten(e));
     const kc = me.filter(isEaten).reduce((a, e) => a + nutr(e.food, e.g).kcal, 0), pk = planned.reduce((a, e) => a + nutr(e.food, e.g).kcal, 0);
     const canCopy = !me.length && (S.entries[addDays(d, -1)] || []).some(e => e.meal === id);
-    const hkBtn = hkOn && eatenN ? (HealthExport.unsent(me, id, S.hk[d]).length
+    const hkBtn = hkOn && eatenN && d <= today() ? (HealthExport.unsent(me, id, S.hk[d]).length
       ? `<button class="icon-plain" data-hk="${id}" aria-label="${t('An Health senden')}" title="${t('An Health senden')}">${I('heart')}</button>`
       : `<button class="icon-plain hk-done" data-hk="${id}" aria-label="${t('Schon in Health')}" title="${t('Schon in Health')}">${I('heart')}</button>`) : '';
     html += `<section class="card meal"><header class="card-h"><h3>${t(name)}</h3><span class="card-v">${eatenN ? de(kc) + ' kcal' : ''}${pk ? `${eatenN ? ' ' : ''}<span class="plan-k">+${de(pk)} ${t('geplant')}</span>` : ''}</span></header>
@@ -76,11 +76,13 @@ function projLine(tt, pt, g) {
     Undo only clears the mark (the shortcut cannot take values back out of Health). */
 function sendMealToHealth(date, meal) {
   const list = HealthExport.unsent(S.entries[date], meal, S.hk[date]);
+  if (date > today()) return;   // no future days in Health
   if (!list.length) return toast(t('Schon in Health'));
   const tot = HealthExport.totals(list, e => nutr(e.food, e.g)), ids = list.map(e => e.id);
   (S.hk[date] ||= []).push(...ids); save(true); rerender();
   undoable(t('{n} kcal an Health gesendet', { n: de(tot.calories) }), () => { S.hk[date] = (S.hk[date] || []).filter(x => !ids.includes(x)); save(true); rerender(); });
-  location.href = HealthExport.url(tot);
+  const now = new Date(), hm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  location.href = HealthExport.url(tot, HealthExport.stamp(date, meal, today(), hm));
 }
 /** One tap: planned -> eaten at the planned amount. Undo puts it back to planned. */
 function confirmPlanned(date, list) {

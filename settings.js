@@ -34,7 +34,8 @@ function renderProfile(v) {
   <div class="sec"><h4>${t('Daten')}</h4></div>
   <div class="card list">${navRow('exJson', 'download', t('Backup exportieren'), t('Alle Daten als JSON-Datei'))}
     <label class="row-item nav"><span class="row-ic">${I('upload')}</span><span class="grow"><span class="nm">${t('Backup importieren')}</span><span class="sub">${t('Ersetzt die aktuellen Daten')}</span></span>${I('chevR', 'chev')}<input type="file" id="imJson" accept=".json,application/json" hidden></label>
-    ${navRow('exCsv', 'file', t('Tagebuch als CSV'))}</div>
+    ${navRow('exCsv', 'file', t('Tagebuch als CSV'))}
+    ${HealthExport.supported(navigator.userAgent) ? navRow('hkReset', 'heart', t('Health-Markierungen zurücksetzen'), t('Alle Mahlzeiten gelten wieder als nicht gesendet')) : ''}</div>
   <div class="card list"><button class="row-item danger-row" id="wipe">${t('Alle Daten löschen')}</button></div>
   <p class="foot">${t('Alles bleibt auf diesem Gerät – kein Konto, keine Cloud, keine Paywall.')}<br>${t('{p} Produkte offline · {b} Basis-Lebensmittel', { p: Object.keys(S.products).length, b: BASE_FOODS.length })} · <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a></p>
   <p class="foot">${t('Produktdaten © Open-Food-Facts-Mitwirkende, Lizenz')} <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL</a>. ${t('Allgemeine Lebensmittel: USDA FoodData Central (gemeinfrei).')}</p>`;
@@ -64,6 +65,10 @@ function renderProfile(v) {
     delete data.sync;   // sync bookkeeping belongs to this device only
     S = sanitize(data); save(); applyTheme(); rerender(); toast(t('Backup importiert'));
   };
+  $('#hkReset')?.addEventListener('click', async () => {
+    if (!await confirmSheet({ title: t('Health-Markierungen zurücksetzen?'), text: t('Alle Mahlzeiten gelten wieder als nicht gesendet. In Health bleibt, was schon dort ist: lösche es dort selbst.'), ok: t('Zurücksetzen') })) return;
+    S.hk = {}; save(true); rerender(); toast(t('Health-Markierungen zurückgesetzt'));
+  });
   $('#wipe').onclick = async () => {
     if (!await confirmSheet({ title: t('Alle Daten löschen?'), text: t('Tagebuch, eigene Lebensmittel und Einstellungen werden von diesem Gerät entfernt. Das kann nicht rückgängig gemacht werden.'), ok: t('Alle Daten löschen'), danger: true })) return;
     const { theme } = S.settings; S = sanitize({}); S.settings.theme = theme; save(); ui.date = today(); render(); toast(t('Alle Daten gelöscht'));
