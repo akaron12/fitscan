@@ -80,7 +80,7 @@ function sendMealToHealth(date, meal) {
   const tot = HealthExport.totals(list, e => nutr(e.food, e.g)), ids = list.map(e => e.id);
   (S.hk[date] ||= []).push(...ids); save(true); rerender();
   undoable(t('{n} kcal an Health gesendet', { n: de(tot.calories) }), () => { S.hk[date] = (S.hk[date] || []).filter(x => !ids.includes(x)); save(true); rerender(); });
-  location.href = HealthExport.url(tot, location.origin + location.pathname);
+  location.href = HealthExport.url(tot);
 }
 /** One tap: planned -> eaten at the planned amount. Undo puts it back to planned. */
 function confirmPlanned(date, list) {
